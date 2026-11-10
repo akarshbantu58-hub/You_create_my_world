@@ -1,13 +1,17 @@
-// Copy your Firebase Web App config from Firebase Console into this file.
-// These values identify your Firebase project; never put service-account private keys here.
+// Firebase Web App configuration for You Create My World.
+// This is client-side configuration. Never add service-account private keys here.
 export const firebaseConfig = {
-  apiKey: "PASTE_FIREBASE_WEB_API_KEY",
-  authDomain: "PASTE_PROJECT_ID.firebaseapp.com",
-  projectId: "PASTE_PROJECT_ID",
-  appId: "PASTE_FIREBASE_APP_ID"
+  apiKey: "AIzaSyBQ2CrJnZm0tAj6kfy202HZlOGVqtRU4cE",
+  authDomain: "youcreatemyworld-d2a99.firebaseapp.com",
+  projectId: "youcreatemyworld-d2a99",
+  storageBucket: "youcreatemyworld-d2a99.firebasestorage.app",
+  messagingSenderId: "898727282683",
+  appId: "1:898727282683:web:ecf2a928864a923eb2ed5e",
+  measurementId: "G-FF69X2JNB2"
 };
 
-export const firebaseConfigured =
-  firebaseConfig.apiKey !== "PASTE_FIREBASE_WEB_API_KEY" &&
-  firebaseConfig.projectId !== "PASTE_PROJECT_ID" &&
-  firebaseConfig.appId !== "PASTE_FIREBASE_APP_ID";
+export const firebaseConfigured = Boolean(
+  firebaseConfig.apiKey &&
+  firebaseConfig.projectId &&
+  firebaseConfig.appId
+);

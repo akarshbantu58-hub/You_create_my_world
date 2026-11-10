@@ -226,7 +226,8 @@ function bootWorld() {
   // Touch joystick replaces keyboard movement for phone/tablet play.
   const joystick = document.querySelector("#worldJoystick");
   const stick = document.querySelector("#joystickStick");
-  let joystickPointer = null, joyX = 0, joyY = 0, walkPhase = 0;\n  const clock = new THREE.Clock();
+  let joystickPointer = null, joyX = 0, joyY = 0, walkPhase = 0;
+  const clock = new THREE.Clock();
   function updateJoystick(e){
     const r=joystick.getBoundingClientRect(), cx=r.left+r.width/2, cy=r.top+r.height/2;
     const dx=e.clientX-cx, dy=e.clientY-cy, max=r.width*.34, len=Math.hypot(dx,dy)||1;
@@ -237,6 +238,25 @@ function bootWorld() {
   joystick?.addEventListener("pointermove",e=>{if(e.pointerId===joystickPointer)updateJoystick(e);});
   const releaseJoy=()=>{joystickPointer=null;joyX=0;joyY=0;if(stick)stick.style.transform="translate(0,0)";};
   joystick?.addEventListener("pointerup",releaseJoy);joystick?.addEventListener("pointercancel",releaseJoy);joystick?.addEventListener("lostpointercapture",releaseJoy);
+  let runMode=false, jumpVelocity=0, grounded=true, visitCooldown=0;
+  const runButton=document.querySelector("#runMode");
+  const jumpButton=document.querySelector("#jumpPlayer");
+  const visitButton=document.querySelector("#visitNearby");
+  runButton?.addEventListener("click",()=>{runMode=!runMode;runButton.classList.toggle("primary",runMode);runButton.textContent=runMode?"RUN: ON":"RUN";});
+  jumpButton?.addEventListener("click",()=>{if(grounded){jumpVelocity=7.2;grounded=false;}});
+  visitButton?.addEventListener("click",()=>{
+    let nearest=null, distance=Infinity;
+    for(const [index,p] of plots.entries()){
+      const d=Math.hypot(player.position.x-p[0],player.position.z-p[1]);
+      if(d<distance){distance=d;nearest=index;}
+    }
+    const hint=document.querySelector("#worldHint");
+    if(nearest!==null&&distance<8){
+      hint.textContent="You are visiting the outside of neighbourhood home "+String(nearest+1).padStart(4,"0")+". House interiors and owner-approved visits are coming later.";
+    }else{
+      hint.textContent="Walk closer to a house, then tap Visit nearby home.";
+    }
+  });
   const zoomControl=document.querySelector("#cameraZoom");
   zoomControl?.addEventListener("input",()=>{cameraZoom=Number(zoomControl.value);});
   document.querySelector("#zoomOut")?.addEventListener("click",()=>{cameraZoom=Math.min(22,cameraZoom+1);if(zoomControl)zoomControl.value=String(cameraZoom);});
@@ -306,9 +326,9 @@ function bootWorld() {
     const moving=moveLength>0.16;
     if(moving){
       const direction=forward.clone().multiplyScalar(-moveZ).add(right.clone().multiplyScalar(moveX)).normalize();
-      player.position.addScaledVector(direction,9.5*delta*Math.min(1,moveLength));
+      player.position.addScaledVector(direction,(runMode?16:9.5)*delta*Math.min(1,moveLength));
       player.rotation.y=Math.atan2(-direction.x,-direction.z);
-      walkPhase+=delta*10.5*Math.min(1,moveLength);
+      walkPhase+=delta*(runMode?15:10.5)*Math.min(1,moveLength);
       const swing=Math.sin(walkPhase)*0.62;
       legPivots[0].rotation.x=swing;
       legPivots[1].rotation.x=-swing;
@@ -320,6 +340,7 @@ function bootWorld() {
       armPivots.forEach(a=>a.rotation.x=THREE.MathUtils.damp(a.rotation.x,0,10,delta));
       torso.rotation.x=THREE.MathUtils.damp(torso.rotation.x,0,10,delta);
     }
+    if(!grounded||jumpVelocity!==0){player.position.y+=jumpVelocity*delta;jumpVelocity-=18*delta;if(player.position.y<=0){player.position.y=0;jumpVelocity=0;grounded=true;}}
     player.position.x=THREE.MathUtils.clamp(player.position.x,-165,165);
     player.position.z=THREE.MathUtils.clamp(player.position.z,-165,165);
     const eye=player.position.clone().add(new THREE.Vector3(0,firstPerson?1.55:2.3,0));

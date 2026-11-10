@@ -85,6 +85,19 @@ function bootWorld() {
       plots.push([x,z]);
     }
   }
+  function getPlotForLocation(plotNumber, location) {
+    const zones = [
+      p => p[0] < 0 && p[1] < 0,
+      p => p[1] < -60,
+      p => p[0] > 60,
+      p => p[1] > 60,
+      p => p[0] < -60,
+      p => Math.abs(p[0]) <= 48 && Math.abs(p[1]) <= 48
+    ];
+    const candidates = plots.filter(zones[Math.max(0,Math.min(5,Number(location)||0))]);
+    const pool = candidates.length ? candidates : plots;
+    return pool[(Math.max(1,Number(plotNumber)||1)-1)%pool.length];
+  }
   plots.forEach((p,i) => addHouse(p[0],p[1],i));
 
   // Show the signed-in visitor's reserved plot when Firebase reports it.
@@ -92,7 +105,7 @@ function bootWorld() {
   function showOwnedPlot(plotNumber, houseStyle="starter", plotLocation=0) {
     if (ownedPlotGroup) scene.remove(ownedPlotGroup);
     if (!Number.isInteger(plotNumber) || plotNumber < 1) return;
-    const spot = plots[((plotNumber - 1) + (Number(plotLocation||0) * 17)) % plots.length];
+    const spot = getPlotForLocation(plotNumber,plotLocation);
     const [px,pz] = spot;
     const group = new THREE.Group();
     group.position.set(px,0,pz);
@@ -126,8 +139,7 @@ function bootWorld() {
     const homes=(event.detail&&event.detail.homes)||[];
     homes.forEach(home=>{
       if(!Number.isInteger(home.plotNumber)||home.plotNumber<1)return;
-      const index=((home.plotNumber-1)+(Number(home.plotLocation||0)*17))%plots.length;
-      const [x,z]=plots[index];
+      const [x,z]=getPlotForLocation(home.plotNumber,home.plotLocation);
       const marker=new THREE.Group(); marker.position.set(x,0,z);
       const ring=new THREE.Mesh(new THREE.RingGeometry(2.6,3.0,32),new THREE.MeshBasicMaterial({color:"#9d8cff",side:THREE.DoubleSide}));
       ring.rotation.x=-Math.PI/2;ring.position.y=.09;marker.add(ring);

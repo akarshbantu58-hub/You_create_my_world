@@ -25,12 +25,15 @@ service cloud.firestore {
     match /homes/{uid} {
       allow read: if signedIn();
       allow create: if owns(uid)
-        && request.resource.data.keys().hasOnly(['ownerUid', 'displayName', 'plotNumber', 'createdAt', 'houseStyle'])
+        && request.resource.data.keys().hasOnly(['ownerUid', 'displayName', 'plotNumber', 'createdAt', 'houseStyle', 'plotLocation'])
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.displayName is string
         && request.resource.data.displayName.size() <= 24
         && request.resource.data.plotNumber is int
         && request.resource.data.plotNumber >= 1
+        && request.resource.data.plotLocation is int
+        && request.resource.data.plotLocation >= 0
+        && request.resource.data.plotLocation <= 5
         && getAfter(/databases/$(database)/documents/worldMeta/plotCounter).data.nextPlot == request.resource.data.plotNumber + 1;
       allow update: if owns(uid)
         && resource.data.ownerUid == request.auth.uid

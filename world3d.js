@@ -15,6 +15,9 @@ function bootWorld() {
   scene.add(sky);
 
   const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 5000);
+  camera.position.set(0, 310, 0);
+  camera.up.set(0, 0, -1);
+  camera.lookAt(0, 0, 0);
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.7));
   renderer.shadowMap.enabled = true;
@@ -34,6 +37,17 @@ function bootWorld() {
   ground.position.y = -1.6; ground.receiveShadow = true; scene.add(ground);
   const lawn = new THREE.Mesh(new THREE.CircleGeometry(174, 96), grass);
   lawn.rotation.x = -Math.PI / 2; lawn.position.y = 0; lawn.receiveShadow = true; scene.add(lawn);
+
+  // India-shaped overview layer used during the map-to-neighbourhood fly-in.
+  const india = new THREE.Shape();
+  const indiaPoints = [[0,72],[13,61],[18,48],[31,36],[25,22],[16,12],[12,-2],[4,-18],[-5,-38],[-13,-57],[-25,-43],[-34,-24],[-42,-5],[-35,12],[-25,27],[-18,43],[-8,58],[-2,68]];
+  india.moveTo(indiaPoints[0][0],indiaPoints[0][1]);
+  indiaPoints.slice(1).forEach(p=>india.lineTo(p[0],p[1]));
+  india.closePath();
+  const indiaMesh = new THREE.Mesh(new THREE.ShapeGeometry(india),new THREE.MeshStandardMaterial({color:"#5f9c70",roughness:1,side:THREE.DoubleSide}));
+  indiaMesh.rotation.x=-Math.PI/2; indiaMesh.position.y=.025; indiaMesh.scale.set(1.65,1.65,1.65); indiaMesh.receiveShadow=true; scene.add(indiaMesh);
+  const indiaEdge = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(indiaPoints.map(p=>new THREE.Vector3(p[0]*1.65,.07,-p[1]*1.65))),new THREE.LineBasicMaterial({color:"#d7e8bd",transparent:true,opacity:.9}));
+  scene.add(indiaEdge);
 
   // Curved-looking starter neighbourhood: central roads and small home plots.
   const roadA = new THREE.Mesh(new THREE.BoxGeometry(8, 0.08, 340), road);
@@ -123,16 +137,21 @@ function bootWorld() {
     const leg=makeLimb(player,side*.18,.78,.78,.14,trousers,0); legPivots.push(leg);
     const shoe=new THREE.Mesh(new THREE.BoxGeometry(.25,.13,.38),shoes); shoe.position.set(0,-.8,.08); shoe.castShadow=true; leg.add(shoe);
   }
-  player.position.set(3,0,9); scene.add(player);
+  player.position.set(3,0,9); player.visible=false; scene.add(player);
 
   let firstPerson = false, yaw = Math.PI, pitch = -.12;
+  const introStarted=performance.now();
+  const introDuration=6800;
+  const mapStart=new THREE.Vector3(0,310,0);
+  const mapTarget=new THREE.Vector3(0,0,0);
+  let introComplete=false;
   const held = new Set();
   let cameraZoom = 8;
   const mode = document.querySelector("#cameraMode");
   const thirdBtn = document.querySelector("#thirdView"), firstBtn = document.querySelector("#firstView");
   function setView(first) {
     firstPerson = first;
-    player.visible = !first;
+    player.visible = !first && introComplete;
     mode.textContent = first ? "First-person view" : "Third-person view";
     thirdBtn.classList.toggle("primary", !first);
     firstBtn.classList.toggle("primary", first);
@@ -214,8 +233,26 @@ function bootWorld() {
     player.position.z=THREE.MathUtils.clamp(player.position.z,-165,165);
     const eye=player.position.clone().add(new THREE.Vector3(0,firstPerson?1.55:2.3,0));
     const camOffset=firstPerson?new THREE.Vector3(0,0,0):new THREE.Vector3(Math.sin(yaw)*cameraZoom,cameraZoom*.42,Math.cos(yaw)*cameraZoom);
-    camera.position.copy(eye).add(camOffset);
-    target.copy(eye).add(new THREE.Vector3(-Math.sin(yaw)*10,Math.sin(pitch)*10,-Math.cos(yaw)*10));
+    const followPosition=eye.clone().add(camOffset);
+    const followTarget=eye.clone().add(new THREE.Vector3(-Math.sin(yaw)*10,Math.sin(pitch)*10,-Math.cos(yaw)*10));
+    const introT=THREE.MathUtils.clamp((performance.now()-introStarted)/introDuration,0,1);
+    if(introT<1){
+      const eased=introT*introT*(3-2*introT);
+      camera.position.lerpVectors(mapStart,followPosition,eased);
+      target.lerpVectors(mapTarget,followTarget,eased);
+      camera.up.set(0,0,-1).lerp(new THREE.Vector3(0,1,0),eased).normalize();
+      const overlay=document.querySelector("#worldLoading");
+      const bar=document.querySelector("#worldLoadingBar");
+      const label=document.querySelector("#worldLoadingLabel");
+      if(bar)bar.style.width=(introT*100)+"%";
+      if(label)label.textContent=introT<.28?"Loading India map…":introT<.68?"Finding your neighbourhood…":"Building the 3D streets…";
+      if(overlay)overlay.style.opacity=String(Math.max(0,1-introT*1.35));
+    }else{
+      if(!introComplete){introComplete=true;player.visible=!firstPerson;const overlay=document.querySelector("#worldLoading");if(overlay)overlay.remove();}
+      camera.position.copy(followPosition);
+      target.copy(followTarget);
+      camera.up.set(0,1,0);
+    }
     camera.fov=firstPerson?THREE.MathUtils.clamp(62-(cameraZoom-8)*2,38,78):62;
     camera.updateProjectionMatrix();
     camera.lookAt(target);

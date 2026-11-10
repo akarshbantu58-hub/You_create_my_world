@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function owns(uid) { return signedIn() && request.auth.uid == uid; }
+
+    match /profiles/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update: if owns(uid)
+        && request.resource.data.keys().hasOnly([
+          'displayName', 'worldName', 'instagram', 'showInstagram', 'interest', 'updatedAt'
+        ])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() >= 1
+        && request.resource.data.displayName.size() <= 24
+        && request.resource.data.worldName is string
+        && request.resource.data.worldName.matches('^[A-Za-z0-9_]{1,20}$')
+        && request.resource.data.instagram is string
+        && request.resource.data.instagram.size() <= 30
+        && request.resource.data.showInstagram is bool;
+      allow delete: if owns(uid);
+    }
+
+    // The document ID is the authenticated UID: one home per account.
+    match /homes/{uid} {
+      allow read: if signedIn();
+      allow create: if owns(uid)
+        && request.resource.data.keys().hasOnly(['ownerUid', 'displayName', 'createdAt', 'houseStyle'])
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 24;
+      allow update: if owns(uid)
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['houseStyle']);
+      allow delete: if false;
+    }
+
+    match /streetSuggestions/{suggestionId} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['name', 'createdBy', 'creatorName', 'createdAt', 'voteCount'])
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 3
+        && request.resource.data.name.size() <= 40
+        && request.resource.data.creatorName is string
+        && request.resource.data.creatorName.size() <= 24
+        && request.resource.data.voteCount == 0;
+      allow update, delete: if false;
+
+      // One vote per signed-in account for each suggestion.
+      match /votes/{uid} {
+        allow read: if signedIn();
+        allow create: if owns(uid)
+          && request.resource.data.keys().hasOnly(['createdAt'])
+          && !exists(/databases/$(database)/documents/streetSuggestions/$(suggestionId)/votes/$(uid));
+        allow update, delete: if false;
+      }
+    }
+  }
+}

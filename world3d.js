@@ -89,10 +89,10 @@ function bootWorld() {
 
   // Show the signed-in visitor's reserved plot when Firebase reports it.
   let ownedPlotGroup = null;
-  function showOwnedPlot(plotNumber, houseStyle="starter") {
+  function showOwnedPlot(plotNumber, houseStyle="starter", plotLocation=0) {
     if (ownedPlotGroup) scene.remove(ownedPlotGroup);
     if (!Number.isInteger(plotNumber) || plotNumber < 1) return;
-    const spot = plots[(plotNumber - 1) % plots.length];
+    const spot = plots[((plotNumber - 1) + (Number(plotLocation||0) * 17)) % plots.length];
     const [px,pz] = spot;
     const group = new THREE.Group();
     group.position.set(px,0,pz);
@@ -117,7 +117,23 @@ function bootWorld() {
   }
   window.addEventListener("worldHomeClaimed",event=>{
     const detail=event.detail||{};
-    showOwnedPlot(Number(detail.plotNumber),detail.houseStyle||"starter");
+    showOwnedPlot(Number(detail.plotNumber),detail.houseStyle||"starter",Number(detail.plotLocation||0));
+  });
+
+  let neighbourMarkers = [];
+  window.addEventListener("worldNeighboursLoaded",event=>{
+    neighbourMarkers.forEach(g=>scene.remove(g)); neighbourMarkers=[];
+    const homes=(event.detail&&event.detail.homes)||[];
+    homes.forEach(home=>{
+      if(!Number.isInteger(home.plotNumber)||home.plotNumber<1)return;
+      const index=((home.plotNumber-1)+(Number(home.plotLocation||0)*17))%plots.length;
+      const [x,z]=plots[index];
+      const marker=new THREE.Group(); marker.position.set(x,0,z);
+      const ring=new THREE.Mesh(new THREE.RingGeometry(2.6,3.0,32),new THREE.MeshBasicMaterial({color:"#9d8cff",side:THREE.DoubleSide}));
+      ring.rotation.x=-Math.PI/2;ring.position.y=.09;marker.add(ring);
+      const pin=new THREE.Mesh(new THREE.ConeGeometry(.38,.9,12),new THREE.MeshStandardMaterial({color:"#9d8cff",emissive:"#463b9a",emissiveIntensity:.5}));
+      pin.position.y=1.1;marker.add(pin);scene.add(marker);neighbourMarkers.push(marker);
+    });
   });
 
   // A small park, trees and a glowing community beacon.

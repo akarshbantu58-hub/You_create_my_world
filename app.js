@@ -8,7 +8,7 @@ panel?.append(cloudBox);
 
 const homePanel = document.querySelector("#myhome .panel");
 const homeControls = document.createElement("div");
-homeControls.innerHTML = '<div class="actions"><button type="button" id="claimPlot" class="primary" disabled>Claim my free plot</button></div><p id="plotStatus" class="muted">Sign in to check your plot.</p>';
+homeControls.innerHTML = '<div class="actions"><button type="button" id="claimPlot" class="primary" disabled>Claim my free plot</button></div><p id="plotStatus" class="muted">Sign in to check your plot.</p><div id="homeCustomiser" class="notice hidden"><h3>Customise your home</h3><label for="houseStyle">House design</label><select id="houseStyle"><option value="starter">Starter home</option><option value="modern">Modern glass home</option><option value="cottage">Garden cottage</option><option value="villa">Blue-roof villa</option></select><div class="actions"><button type="button" id="saveHouseStyle" class="primary">Save house design</button></div><p id="houseStyleStatus" class="muted">Choose a design and save it to your account.</p></div>';
 homePanel?.append(homeControls);
 
 const communityPanel = document.querySelector("#community .panel");
@@ -26,6 +26,10 @@ const signInButton = document.querySelector("#googleSignIn");
 const signOutButton = document.querySelector("#signOut");
 const claimButton = document.querySelector("#claimPlot");
 const plotStatus = document.querySelector("#plotStatus");
+const homeCustomiser = document.querySelector("#homeCustomiser");
+const houseStyleSelect = document.querySelector("#houseStyle");
+const saveHouseStyleButton = document.querySelector("#saveHouseStyle");
+const houseStyleStatus = document.querySelector("#houseStyleStatus");
 const ideaStatus = document.querySelector("#suggestionStatus");
 const ideaList = document.querySelector("#liveSuggestions");
 
@@ -63,6 +67,7 @@ async function startCloud() {
         status.textContent = "Not signed in. Your local preview profile stays on this device.";
         signOutButton.classList.add("hidden");
         claimButton.disabled = true;
+        homeCustomiser?.classList.add("hidden");
         plotStatus.textContent = "Sign in to claim your one free virtual home plot.";
         ideaStatus.textContent = "Sign in to suggest and vote.";
         return;
@@ -87,6 +92,20 @@ async function startCloud() {
       }
       await loadHome(user, db, dbSdk);
       await loadIdeas(db, dbSdk, user);
+    });
+
+    saveHouseStyleButton?.addEventListener("click", async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+      saveHouseStyleButton.disabled = true;
+      try {
+        await dbSdk.updateDoc(dbSdk.doc(db,"homes",user.uid), {houseStyle:houseStyleSelect.value});
+        houseStyleStatus.textContent = "House design saved to your account.";
+      } catch (e) {
+        houseStyleStatus.textContent = "Could not save design: " + e.message;
+      } finally {
+        saveHouseStyleButton.disabled = false;
+      }
     });
 
     claimButton.addEventListener("click", async () => {
@@ -140,9 +159,14 @@ async function loadHome(user, db, sdk) {
   try {
     const snap = await sdk.getDoc(sdk.doc(db,"homes",user.uid));
     plotStatus.textContent = snap.exists()
-      ? "Your home plot is reserved. House ID: " + user.uid.slice(0,8).toUpperCase()
+      ? "Your home plot is reserved. Home code: " + user.uid.slice(0,8).toUpperCase()
       : "Your free plot is available. Tap Claim my free plot.";
     claimButton.disabled = snap.exists();
+    homeCustomiser?.classList.toggle("hidden", !snap.exists());
+    if (snap.exists() && houseStyleSelect) {
+      houseStyleSelect.value = snap.data().houseStyle || "starter";
+      houseStyleStatus.textContent = "Your saved house design is loaded.";
+    }
   } catch (e) {
     plotStatus.textContent = "Could not load plot: " + e.message;
   }

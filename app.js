@@ -52,6 +52,27 @@ async function startCloud() {
     const db = dbSdk.getFirestore(app);
     signInButton.disabled = false;
 
+    window.addEventListener("worldProfileSaved", async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+      try {
+        const local = JSON.parse(localStorage.getItem("worldProfile") || sessionStorage.getItem("worldProfile") || "{}");
+        const worldName = String(local.worldName || "").replace(/[^A-Za-z0-9_]/g,"").slice(0,20);
+        if (!worldName) return;
+        await dbSdk.setDoc(dbSdk.doc(db,"profiles",user.uid), {
+          displayName:String(local.displayName || "World Visitor").slice(0,24),
+          worldName,
+          instagram:String(local.instagram || "").slice(0,30),
+          showInstagram:Boolean(local.showInstagram),
+          interest:String(local.interest || "Explore the world").slice(0,40),
+          updatedAt:dbSdk.serverTimestamp()
+        }, {merge:true});
+        status.textContent = "Your profile is saved and synced to your world account.";
+      } catch (error) {
+        status.textContent = "Profile saved on this device, but cloud sync failed: " + error.message;
+      }
+    });
+
     signInButton.addEventListener("click", async () => {
       try {
         const provider = new authSdk.GoogleAuthProvider();

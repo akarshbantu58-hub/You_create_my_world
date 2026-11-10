@@ -82,14 +82,41 @@ function bootWorld() {
   const beacon = new THREE.Mesh(new THREE.CylinderGeometry(.28,.5,3.2,12),new THREE.MeshStandardMaterial({color:"#58e5ee",emissive:"#168da8",emissiveIntensity:1.2}));
   beacon.position.set(0,1.7,-8); scene.add(beacon);
 
-  // Player is visible in third-person mode and hidden in first-person mode.
+  // A recognisable human avatar built from detailed 3D body parts.
   const player = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(.38,.8,4,8),mat("#55d7e5"));
-  body.position.y = 1.0; body.castShadow=true; player.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(.28,16,12),mat("#efc9a4"));
-  head.position.y=1.72; player.add(head);
-  const marker = new THREE.Mesh(new THREE.ConeGeometry(.18,.45,8),mat("#f4d477"));
-  marker.position.set(0,2.12,0); marker.rotation.x=Math.PI; player.add(marker);
+  const skin = mat("#d9a47f"), shirt = mat("#247b9a"), trousers = mat("#26334c"), shoes = mat("#18202c"), hair = mat("#241b19");
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(.34,.62,6,12),shirt);
+  torso.position.y=1.18; torso.castShadow=true; player.add(torso);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(.105,.12,.2,12),skin);
+  neck.position.y=1.64; player.add(neck);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.245,24,18),skin);
+  head.position.y=1.91; head.scale.set(1,1.12,.92); head.castShadow=true; player.add(head);
+  const hairCap = new THREE.Mesh(new THREE.SphereGeometry(.25,20,12,0,Math.PI*2,0,Math.PI*.56),hair);
+  hairCap.position.set(0,2.01,-.015); hairCap.scale.set(1.04,.95,1); player.add(hairCap);
+  const fringe = new THREE.Mesh(new THREE.SphereGeometry(.13,14,10),hair);
+  fringe.position.set(0,2.04,.19); fringe.scale.set(1,.5,.45); player.add(fringe);
+  const eyeWhite=mat("#fff7e9"), iris=mat("#30251f");
+  for(const x of [-.085,.085]){
+    const eye=new THREE.Mesh(new THREE.SphereGeometry(.035,10,8),eyeWhite);
+    eye.position.set(x,1.94,.216); player.add(eye);
+    const pupil=new THREE.Mesh(new THREE.SphereGeometry(.018,8,6),iris);
+    pupil.position.set(x,1.94,.246); player.add(pupil);
+  }
+  const nose=new THREE.Mesh(new THREE.SphereGeometry(.035,10,8),skin);
+  nose.position.set(0,1.885,.245); nose.scale.set(.8,1,.8); player.add(nose);
+  const armPivots=[], legPivots=[];
+  function makeLimb(parent,x,y,length,radius,material,rotation=0){
+    const pivot=new THREE.Group(); pivot.position.set(x,y,0); pivot.rotation.z=rotation; parent.add(pivot);
+    const limb=new THREE.Mesh(new THREE.CapsuleGeometry(radius,length-radius*2,4,10),material);
+    limb.position.y=-length/2; limb.castShadow=true; pivot.add(limb);
+    return pivot;
+  }
+  for(const side of [-1,1]){
+    const arm=makeLimb(player,side*.43,1.42,.72,.115,shirt,side*-.08); armPivots.push(arm);
+    const hand=new THREE.Mesh(new THREE.SphereGeometry(.105,12,10),skin); hand.position.set(0,-.76,0); arm.add(hand);
+    const leg=makeLimb(player,side*.18,.78,.78,.14,trousers,0); legPivots.push(leg);
+    const shoe=new THREE.Mesh(new THREE.BoxGeometry(.25,.13,.38),shoes); shoe.position.set(0,-.8,.08); shoe.castShadow=true; leg.add(shoe);
+  }
   player.position.set(3,0,9); scene.add(player);
 
   let firstPerson = false, yaw = Math.PI, pitch = -.12;
@@ -113,14 +140,14 @@ function bootWorld() {
   // Touch joystick replaces keyboard movement for phone/tablet play.
   const joystick = document.querySelector("#worldJoystick");
   const stick = document.querySelector("#joystickStick");
-  let joystickPointer = null, joyX = 0, joyY = 0;
+  let joystickPointer = null, joyX = 0, joyY = 0, walkPhase = 0;
   function updateJoystick(e){
     const r=joystick.getBoundingClientRect(), cx=r.left+r.width/2, cy=r.top+r.height/2;
     const dx=e.clientX-cx, dy=e.clientY-cy, max=r.width*.34, len=Math.hypot(dx,dy)||1;
     const scale=Math.min(1,max/len); joyX=dx/len*scale; joyY=dy/len*scale;
     stick.style.transform=`translate(${joyX*max}px, ${joyY*max}px)`;
   }
-  joystick?.addEventListener("pointerdown",e=>{e.preventDefault();joystickPointer=e.pointerId;joystick.setPointerCapture(e.pointerId);updateJoystick(e);});
+  joystick?.addEventListener("pointerdown",e=>{e.preventDefault();joystickPointer=e.pointerId;if(joystick.setPointerCapture)joystick.setPointerCapture(e.pointerId);updateJoystick(e);});
   joystick?.addEventListener("pointermove",e=>{if(e.pointerId===joystickPointer)updateJoystick(e);});
   const releaseJoy=()=>{joystickPointer=null;joyX=0;joyY=0;if(stick)stick.style.transform="translate(0,0)";};
   joystick?.addEventListener("pointerup",releaseJoy);joystick?.addEventListener("pointercancel",releaseJoy);joystick?.addEventListener("lostpointercapture",releaseJoy);

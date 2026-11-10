@@ -5,10 +5,16 @@ if (canvas) bootWorld();
 
 function bootWorld() {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color("#08152a");
-  scene.fog = new THREE.Fog("#08152a", 34, 95);
+  scene.background = new THREE.Color("#6bb8e8");
+  // A large gradient sky dome gives a distant horizon without a short fog cutoff.
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(4500, 32, 16), new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false,
+    vertexShader: "varying vec3 vWorldPosition; void main(){ vec4 p=modelMatrix*vec4(position,1.0); vWorldPosition=p.xyz; gl_Position=projectionMatrix*viewMatrix*p; }",
+    fragmentShader: "varying vec3 vWorldPosition; void main(){ float h=normalize(vWorldPosition).y; vec3 horizon=vec3(0.62,0.82,0.94); vec3 zenith=vec3(0.025,0.10,0.28); float t=smoothstep(-0.12,0.72,h); gl_FragColor=vec4(mix(horizon,zenith,t),1.0); }"
+  }));
+  scene.add(sky);
 
-  const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 180);
+  const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 5000);
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.7));
   renderer.shadowMap.enabled = true;
@@ -87,7 +93,8 @@ function bootWorld() {
   player.position.set(3,0,9); scene.add(player);
 
   let firstPerson = false, yaw = Math.PI, pitch = -.12;
-  const keys = new Set(), held = new Set();
+  const held = new Set();
+  let cameraZoom = 8;
   const mode = document.querySelector("#cameraMode");
   const thirdBtn = document.querySelector("#thirdView"), firstBtn = document.querySelector("#firstView");
   function setView(first) {
@@ -103,16 +110,27 @@ function bootWorld() {
     player.position.set(3,0,9); yaw=Math.PI; pitch=-.12;
   });
 
-  window.addEventListener("keydown",e=>{
-    if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key)) e.preventDefault();
-    keys.add(e.key.toLowerCase());
-  },{passive:false});
-  window.addEventListener("keyup",e=>keys.delete(e.key.toLowerCase()));
-  document.querySelectorAll("[data-move]").forEach(btn=>{
-    const key=btn.dataset.move;
-    btn.addEventListener("pointerdown",e=>{e.preventDefault();held.add(key);btn.setPointerCapture(e.pointerId);});
-    const stop=()=>held.delete(key);
-    btn.addEventListener("pointerup",stop);btn.addEventListener("pointercancel",stop);btn.addEventListener("lostpointercapture",stop);
+  // Touch joystick replaces keyboard movement for phone/tablet play.
+  const joystick = document.querySelector("#worldJoystick");
+  const stick = document.querySelector("#joystickStick");
+  let joystickPointer = null, joyX = 0, joyY = 0;
+  function updateJoystick(e){
+    const r=joystick.getBoundingClientRect(), cx=r.left+r.width/2, cy=r.top+r.height/2;
+    const dx=e.clientX-cx, dy=e.clientY-cy, max=r.width*.34, len=Math.hypot(dx,dy)||1;
+    const scale=Math.min(1,max/len); joyX=dx/len*scale; joyY=dy/len*scale;
+    stick.style.transform=`translate(${joyX*max}px, ${joyY*max}px)`;
+  }
+  joystick?.addEventListener("pointerdown",e=>{e.preventDefault();joystickPointer=e.pointerId;joystick.setPointerCapture(e.pointerId);updateJoystick(e);});
+  joystick?.addEventListener("pointermove",e=>{if(e.pointerId===joystickPointer)updateJoystick(e);});
+  const releaseJoy=()=>{joystickPointer=null;joyX=0;joyY=0;if(stick)stick.style.transform="translate(0,0)";};
+  joystick?.addEventListener("pointerup",releaseJoy);joystick?.addEventListener("pointercancel",releaseJoy);joystick?.addEventListener("lostpointercapture",releaseJoy);
+  const zoomControl=document.querySelector("#cameraZoom");
+  zoomControl?.addEventListener("input",()=>{cameraZoom=Number(zoomControl.value);});
+  document.querySelector("#zoomOut")?.addEventListener("click",()=>{cameraZoom=Math.min(22,cameraZoom+1);if(zoomControl)zoomControl.value=String(cameraZoom);});
+  document.querySelector("#zoomIn")?.addEventListener("click",()=>{cameraZoom=Math.max(3,cameraZoom-1);if(zoomControl)zoomControl.value=String(cameraZoom);});
+  document.querySelector("#worldFullscreen")?.addEventListener("click",async()=>{
+    const frame=document.querySelector(".world-frame");
+    try{if(!document.fullscreenElement)await frame.requestFullscreen();else await document.exitFullscreen();}catch(e){document.querySelector("#worldHint").textContent="Fullscreen is not available in this browser. Try the browser menu.";}
   });
 
   let dragging=false,lastX=0,lastY=0;
@@ -135,10 +153,8 @@ function bootWorld() {
   const forward = new THREE.Vector3(), right = new THREE.Vector3(), target = new THREE.Vector3();
   function animate(){
     requestAnimationFrame(animate);
-    const forwardKey=keys.has("w")||keys.has("arrowup")||held.has("forward");
-    const backKey=keys.has("s")||keys.has("arrowdown")||held.has("back");
-    const leftKey=keys.has("a")||keys.has("arrowleft")||held.has("left");
-    const rightKey=keys.has("d")||keys.has("arrowright")||held.has("right");
+    const forwardKey=joyY < -.12, backKey=joyY > .12;
+    const leftKey=joyX < -.12, rightKey=joyX > .12;
     forward.set(-Math.sin(yaw),0,-Math.cos(yaw));
     right.set(Math.cos(yaw),0,-Math.sin(yaw));
     const speed=.12;
@@ -150,10 +166,11 @@ function bootWorld() {
     player.position.z=THREE.MathUtils.clamp(player.position.z,-30,30);
     player.rotation.y=yaw;
     const eye=player.position.clone().add(new THREE.Vector3(0,firstPerson?1.55:2.3,0));
-    const distance=firstPerson?0:.0;
-    const camOffset=firstPerson?new THREE.Vector3(0,0,0):new THREE.Vector3(Math.sin(yaw)*7,3.2,Math.cos(yaw)*7);
+    const camOffset=firstPerson?new THREE.Vector3(0,0,0):new THREE.Vector3(Math.sin(yaw)*cameraZoom,cameraZoom*.42,Math.cos(yaw)*cameraZoom);
     camera.position.copy(eye).add(camOffset);
     target.copy(eye).add(new THREE.Vector3(-Math.sin(yaw)*10,Math.sin(pitch)*10,-Math.cos(yaw)*10));
+    camera.fov=firstPerson?THREE.MathUtils.clamp(62-(cameraZoom-8)*2,38,78):62;
+    camera.updateProjectionMatrix();
     camera.lookAt(target);
     beacon.rotation.y+=.006;
     renderer.render(scene,camera);

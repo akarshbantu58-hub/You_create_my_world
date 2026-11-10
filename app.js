@@ -1,0 +1,186 @@
+import { firebaseConfig, firebaseConfigured } from "./firebase-config.js";
+
+const panel = document.querySelector("#profile .panel");
+const cloudBox = document.createElement("div");
+cloudBox.className = "notice";
+cloudBox.innerHTML = '<strong>World account</strong><p id="cloudStatus">Connect Firebase to enable shared accounts, homes and voting.</p><div class="actions"><button type="button" id="googleSignIn" class="primary">Continue with Google</button><button type="button" id="signOut" class="hidden">Sign out</button></div>';
+panel?.append(cloudBox);
+
+const homePanel = document.querySelector("#myhome .panel");
+const homeControls = document.createElement("div");
+homeControls.innerHTML = '<div class="actions"><button type="button" id="claimPlot" class="primary" disabled>Claim my free plot</button></div><p id="plotStatus" class="muted">Sign in to check your plot.</p>';
+homePanel?.append(homeControls);
+
+const communityPanel = document.querySelector("#community .panel");
+const suggestionForm = document.createElement("form");
+suggestionForm.className = "panel";
+suggestionForm.innerHTML = '<h3>Suggest a street name</h3><label for="streetName">Street name</label><input id="streetName" maxlength="40" minlength="3" placeholder="Example: Aurora Avenue" required><button class="primary" type="submit">Submit suggestion</button><p class="muted" id="suggestionStatus">Sign in to suggest and vote.</p>';
+communityPanel?.after(suggestionForm);
+const liveIdeas = document.createElement("div");
+liveIdeas.className = "panel";
+liveIdeas.innerHTML = '<h3>Community suggestions</h3><div id="liveSuggestions" class="muted">Connect your world account to load suggestions.</div>';
+suggestionForm.after(liveIdeas);
+
+const status = document.querySelector("#cloudStatus");
+const signInButton = document.querySelector("#googleSignIn");
+const signOutButton = document.querySelector("#signOut");
+const claimButton = document.querySelector("#claimPlot");
+const plotStatus = document.querySelector("#plotStatus");
+const ideaStatus = document.querySelector("#suggestionStatus");
+const ideaList = document.querySelector("#liveSuggestions");
+
+if (!firebaseConfigured) {
+  status.textContent = "Firebase is not connected yet. The preview still works. Add your Firebase Web App settings to firebase-config.js, then enable Google sign-in and Firestore.";
+  signInButton.disabled = true;
+} else {
+  startCloud();
+}
+
+async function startCloud() {
+  try {
+    const [{ initializeApp }, authSdk, dbSdk] = await Promise.all([
+      import("https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"),
+      import("https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"),
+      import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js")
+    ]);
+    const app = initializeApp(firebaseConfig);
+    const auth = authSdk.getAuth(app);
+    const db = dbSdk.getFirestore(app);
+    signInButton.disabled = false;
+
+    signInButton.addEventListener("click", async () => {
+      try {
+        const provider = new authSdk.GoogleAuthProvider();
+        await authSdk.signInWithRedirect(auth, provider);
+      } catch (error) {
+        status.textContent = "Sign-in could not start: " + error.message;
+      }
+    });
+    signOutButton.addEventListener("click", () => authSdk.signOut(auth));
+
+    authSdk.onAuthStateChanged(auth, async user => {
+      if (!user) {
+        status.textContent = "Not signed in. Your local preview profile stays on this device.";
+        signOutButton.classList.add("hidden");
+        claimButton.disabled = true;
+        plotStatus.textContent = "Sign in to claim your one free virtual home plot.";
+        ideaStatus.textContent = "Sign in to suggest and vote.";
+        return;
+      }
+      signInButton.classList.add("hidden");
+      signOutButton.classList.remove("hidden");
+      status.textContent = "Signed in. Your Google account is connected to this world.";
+      claimButton.disabled = false;
+      const local = JSON.parse(localStorage.getItem("worldProfile") || sessionStorage.getItem("worldProfile") || "{}");
+      const profile = {
+        displayName: String(local.displayName || user.displayName || "World Visitor").slice(0,24),
+        worldName: String(local.worldName || ("visitor_" + user.uid.slice(0,8))).replace(/[^A-Za-z0-9_]/g,"").slice(0,20),
+        instagram: String(local.instagram || "").slice(0,30),
+        showInstagram: Boolean(local.showInstagram),
+        interest: String(local.interest || "Explore the world").slice(0,40),
+        updatedAt: dbSdk.serverTimestamp()
+      };
+      try {
+        await dbSdk.setDoc(dbSdk.doc(db,"profiles",user.uid), profile, {merge:true});
+      } catch (e) {
+        status.textContent = "Signed in, but profile sync failed. Check Firestore rules: " + e.message;
+      }
+      await loadHome(user, db, dbSdk);
+      await loadIdeas(db, dbSdk, user);
+    });
+
+    claimButton.addEventListener("click", async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+      const local = JSON.parse(localStorage.getItem("worldProfile") || sessionStorage.getItem("worldProfile") || "{}");
+      const homeRef = dbSdk.doc(db,"homes",user.uid);
+      try {
+        await dbSdk.runTransaction(db, async tx => {
+          const existing = await tx.get(homeRef);
+          if (existing.exists()) throw new Error("You already have your one free plot.");
+          tx.set(homeRef, {
+            ownerUid:user.uid,
+            displayName:String(local.displayName || user.displayName || "World Visitor").slice(0,24),
+            createdAt:dbSdk.serverTimestamp(),
+            houseStyle:"starter"
+          });
+        });
+        await loadHome(user, db, dbSdk);
+      } catch (e) {
+        plotStatus.textContent = e.message.includes("already") ? e.message : "Could not claim plot: " + e.message;
+      }
+    });
+
+    suggestionForm.addEventListener("submit", async event => {
+      event.preventDefault();
+      const user = auth.currentUser;
+      if (!user) { ideaStatus.textContent = "Sign in first."; return; }
+      const local = JSON.parse(localStorage.getItem("worldProfile") || sessionStorage.getItem("worldProfile") || "{}");
+      const name = document.querySelector("#streetName").value.trim();
+      if (name.length < 3 || name.length > 40) return;
+      try {
+        await dbSdk.addDoc(dbSdk.collection(db,"streetSuggestions"), {
+          name, createdBy:user.uid,
+          creatorName:String(local.displayName || user.displayName || "World Visitor").slice(0,24),
+          createdAt:dbSdk.serverTimestamp(), voteCount:0
+        });
+        document.querySelector("#streetName").value = "";
+        ideaStatus.textContent = "Suggestion submitted!";
+        await loadIdeas(db, dbSdk, user);
+      } catch (e) {
+        ideaStatus.textContent = "Could not submit: " + e.message;
+      }
+    });
+  } catch (error) {
+    status.textContent = "Firebase setup error: " + error.message;
+  }
+}
+
+async function loadHome(user, db, sdk) {
+  try {
+    const snap = await sdk.getDoc(sdk.doc(db,"homes",user.uid));
+    plotStatus.textContent = snap.exists()
+      ? "Your home plot is reserved. House ID: " + user.uid.slice(0,8).toUpperCase()
+      : "Your free plot is available. Tap Claim my free plot.";
+    claimButton.disabled = snap.exists();
+  } catch (e) {
+    plotStatus.textContent = "Could not load plot: " + e.message;
+  }
+}
+
+async function loadIdeas(db, sdk, user) {
+  try {
+    const q = sdk.query(sdk.collection(db,"streetSuggestions"), sdk.orderBy("createdAt","desc"), sdk.limit(30));
+    const result = await sdk.getDocs(q);
+    ideaList.replaceChildren();
+    if (result.empty) {
+      ideaList.textContent = "No suggestions yet. Be the first to suggest a street name!";
+      return;
+    }
+    for (const item of result.docs) {
+      const data = item.data();
+      const row = document.createElement("div");
+      row.className = "vote";
+      const label = document.createElement("span");
+      label.textContent = data.name + " · suggested by " + (data.creatorName || "Visitor");
+      const vote = document.createElement("button");
+      vote.type = "button";
+      vote.textContent = "Vote";
+      vote.addEventListener("click", async () => {
+        if (!user) return;
+        vote.disabled = true;
+        try {
+          await sdk.setDoc(sdk.doc(db,"streetSuggestions",item.id,"votes",user.uid), {createdAt:sdk.serverTimestamp()});
+          vote.textContent = "Voted";
+        } catch (e) {
+          vote.textContent = e.code === "permission-denied" ? "Already voted" : "Try again";
+          vote.disabled = false;
+        }
+      });
+      row.append(label,vote);
+      ideaList.append(row);
+    }
+  } catch (e) {
+    ideaList.textContent = "Could not load suggestions: " + e.message;
+  }
+}

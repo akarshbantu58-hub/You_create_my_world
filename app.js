@@ -135,15 +135,20 @@ async function startCloud() {
       const local = JSON.parse(localStorage.getItem("worldProfile") || sessionStorage.getItem("worldProfile") || "{}");
       const homeRef = dbSdk.doc(db,"homes",user.uid);
       try {
+        const counterRef = dbSdk.doc(db,"worldMeta","plotCounter");
         await dbSdk.runTransaction(db, async tx => {
           const existing = await tx.get(homeRef);
           if (existing.exists()) throw new Error("You already have your one free plot.");
+          const counter = await tx.get(counterRef);
+          const plotNumber = counter.exists() ? Number(counter.data().nextPlot || 1) : 1;
           tx.set(homeRef, {
             ownerUid:user.uid,
             displayName:String(local.displayName || user.displayName || "World Visitor").slice(0,24),
+            plotNumber,
             createdAt:dbSdk.serverTimestamp(),
             houseStyle:"starter"
           });
+          tx.set(counterRef,{nextPlot:plotNumber+1});
         });
         await loadHome(user, db, dbSdk);
       } catch (e) {
@@ -180,10 +185,11 @@ async function loadHome(user, db, sdk) {
   try {
     const snap = await sdk.getDoc(sdk.doc(db,"homes",user.uid));
     plotStatus.textContent = snap.exists()
-      ? "Your home plot is reserved. Home code: " + user.uid.slice(0,8).toUpperCase()
+      ? "Your home is reserved! House number: " + (snap.data().plotNumber ? String(snap.data().plotNumber).padStart(4,"0") : "pending migration")
       : "Your free plot is available. Tap Claim my free plot.";
     claimButton.disabled = snap.exists();
     homeCustomiser?.classList.toggle("hidden", !snap.exists());
+    if (snap.exists()) window.dispatchEvent(new CustomEvent("worldHomeClaimed",{detail:{plotNumber:snap.data().plotNumber || null,houseStyle:snap.data().houseStyle || "starter"}}));
     if (snap.exists() && houseStyleSelect) {
       houseStyleSelect.value = snap.data().houseStyle || "starter";
       houseStyleStatus.textContent = "Your saved house design is loaded.";

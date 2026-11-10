@@ -54,6 +54,21 @@ async function startCloud() {
     const auth = authSdk.getAuth(app);
     const db = dbSdk.getFirestore(app);
     signInButton.disabled = false;
+    let presenceTimer=null, presenceUnsubscribe=null, currentPosition={x:0,z:0};
+    const presenceStatus=document.querySelector("#multiplayerStatus");
+    window.addEventListener("worldLocalPosition",event=>{currentPosition={x:Number(event.detail?.x)||0,z:Number(event.detail?.z)||0};});
+    function stopPresence(uid){if(presenceTimer)clearInterval(presenceTimer);presenceTimer=null;if(presenceUnsubscribe)presenceUnsubscribe();presenceUnsubscribe=null;if(uid)dbSdk.deleteDoc(dbSdk.doc(db,"presence",uid)).catch(()=>{});window.dispatchEvent(new CustomEvent("worldPlayersUpdated",{detail:{players:[]}}));}
+    function startPresence(user,displayName){
+      if(presenceTimer)clearInterval(presenceTimer);if(presenceUnsubscribe)presenceUnsubscribe();
+      const ref=dbSdk.doc(db,"presence",user.uid);
+      const publish=()=>dbSdk.setDoc(ref,{displayName:String(displayName||"World visitor").slice(0,24),x:Math.max(-165,Math.min(165,currentPosition.x)),z:Math.max(-165,Math.min(165,currentPosition.z)),lastSeen:dbSdk.serverTimestamp()},{merge:true}).catch(e=>{if(presenceStatus)presenceStatus.textContent="Live player sync unavailable: "+e.message;});
+      publish();presenceTimer=setInterval(publish,2500);
+      presenceUnsubscribe=dbSdk.onSnapshot(dbSdk.query(dbSdk.collection(db,"presence"),dbSdk.limit(40)),snap=>{
+        const now=Date.now();const players=snap.docs.filter(d=>d.id!==user.uid).map(d=>{const v=d.data();const seen=v.lastSeen?.toMillis?.()||0;return {id:d.id,displayName:String(v.displayName||"World visitor").slice(0,24),x:Number(v.x)||0,z:Number(v.z)||0,online:seen>0&&now-seen<12000};}).filter(p=>p.online);
+        window.dispatchEvent(new CustomEvent("worldPlayersUpdated",{detail:{players}}));
+        if(presenceStatus)presenceStatus.textContent="You are online · "+(players.length+1)+" player(s) online now.";
+      },e=>{if(presenceStatus)presenceStatus.textContent="Live players need updated Firebase rules: "+e.message;});
+    }
 
     window.addEventListener("worldProfileSaved", async () => {
       const user = auth.currentUser;
@@ -84,10 +99,12 @@ async function startCloud() {
         status.textContent = "Sign-in could not start: " + error.message;
       }
     });
-    signOutButton.addEventListener("click", () => authSdk.signOut(auth));
+    signOutButton.addEventListener("click", async () => {stopPresence(auth.currentUser?.uid);await authSdk.signOut(auth);});
 
     authSdk.onAuthStateChanged(auth, async user => {
       if (!user) {
+        stopPresence(auth.currentUser?.uid);
+        if(presenceStatus)presenceStatus.textContent="Sign in to join live multiplayer.";
         status.textContent = "Not signed in. Your local preview profile stays on this device.";
         signOutButton.classList.add("hidden");
         claimButton.disabled = true;
@@ -115,6 +132,7 @@ async function startCloud() {
         status.textContent = "Signed in, but profile sync failed. Check Firestore rules: " + e.message;
       }
       await loadHome(user, db, dbSdk);
+      startPresence(user,profile.displayName);
       await loadIdeas(db, dbSdk, user);
     });
 

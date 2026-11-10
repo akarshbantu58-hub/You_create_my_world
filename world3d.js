@@ -264,6 +264,33 @@ function bootWorld() {
   new ResizeObserver(resize).observe(canvas); resize();
 
   const forward = new THREE.Vector3(), right = new THREE.Vector3(), target = new THREE.Vector3();
+  const remotePlayers = new Map();
+  window.addEventListener("worldPlayersUpdated",event=>{
+    const incoming=(event.detail&&event.detail.players)||[];
+    const keep=new Set(incoming.map(p=>p.id));
+    for(const [id,entry] of remotePlayers){if(!keep.has(id)){scene.remove(entry.group);remotePlayers.delete(id);}}
+    for(const data of incoming){
+      let entry=remotePlayers.get(data.id);
+      if(!entry){
+        const group=new THREE.Group();
+        const body=new THREE.Mesh(new THREE.CapsuleGeometry(.38,.85,4,8),mat("#9d8cff"));
+        body.position.y=1.05;body.castShadow=true;group.add(body);
+        const head=new THREE.Mesh(new THREE.SphereGeometry(.3,12,10),mat("#f0c9a8"));
+        head.position.y=1.85;group.add(head);
+        const badgeCanvas=document.createElement("canvas");badgeCanvas.width=512;badgeCanvas.height=112;
+        const ctx=badgeCanvas.getContext("2d");ctx.fillStyle="#071526dd";ctx.fillRect(0,0,512,112);
+        ctx.strokeStyle="#9d8cff";ctx.lineWidth=7;ctx.strokeRect(4,4,504,104);
+        ctx.fillStyle="#ffffff";ctx.font="bold 42px system-ui";ctx.textAlign="center";ctx.textBaseline="middle";
+        ctx.fillText(String(data.displayName||"Visitor").slice(0,20),256,56);
+        const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(badgeCanvas),transparent:true,depthTest:false}));
+        sprite.position.y=2.65;sprite.scale.set(5.2,1.15,1);group.add(sprite);
+        scene.add(group);entry={group,target:new THREE.Vector3(data.x||0,0,data.z||0)};
+        remotePlayers.set(data.id,entry);
+      }
+      entry.target.set(THREE.MathUtils.clamp(Number(data.x)||0,-165,165),0,THREE.MathUtils.clamp(Number(data.z)||0,-165,165));
+    }
+  });
+  let lastPositionBroadcast=0;
   function animate(){
     requestAnimationFrame(animate);
     const forwardKey=joyY < -.12, backKey=joyY > .12;
@@ -271,6 +298,9 @@ function bootWorld() {
     forward.set(-Math.sin(yaw),0,-Math.cos(yaw));
     right.set(Math.cos(yaw),0,-Math.sin(yaw));
     const delta=Math.min(clock.getDelta(),0.05);
+    const now=performance.now();
+    if(now-lastPositionBroadcast>250){lastPositionBroadcast=now;window.dispatchEvent(new CustomEvent("worldLocalPosition",{detail:{x:player.position.x,z:player.position.z}}));}
+    for(const entry of remotePlayers.values()){entry.group.position.lerp(entry.target,Math.min(1,delta*8));entry.group.rotation.y=Math.atan2(player.position.x-entry.group.position.x,player.position.z-entry.group.position.z);}
     const moveX=joyX, moveZ=joyY;
     const moveLength=Math.hypot(moveX,moveZ);
     const moving=moveLength>0.16;

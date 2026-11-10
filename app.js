@@ -8,7 +8,7 @@ panel?.append(cloudBox);
 
 const homePanel = document.querySelector("#myhome .panel");
 const homeControls = document.createElement("div");
-homeControls.innerHTML = '<div class="actions"><button type="button" id="claimPlot" class="primary" disabled>Claim my free plot</button></div><p id="plotStatus" class="muted">Sign in to check your plot.</p><div id="homeCustomiser" class="notice hidden"><h3>Customise your home</h3><label for="houseStyle">House design</label><select id="houseStyle"><option value="starter">Starter home</option><option value="modern">Modern glass home</option><option value="cottage">Garden cottage</option><option value="villa">Blue-roof villa</option></select><div class="actions"><button type="button" id="saveHouseStyle" class="primary">Save house design</button></div><p id="houseStyleStatus" class="muted">Choose a design and save it to your account.</p></div>';
+homeControls.innerHTML = '<div class="actions"><button type="button" id="claimPlot" class="primary" disabled>Claim my free plot</button></div><p id="plotStatus" class="muted">Sign in to check your plot.</p><div id="homeCustomiser" class="notice hidden"><h3>Customise your home</h3><label for="houseStyle">House design</label><select id="houseStyle"><option value="starter">Starter home</option><option value="modern">Modern glass home</option><option value="cottage">Garden cottage</option><option value="villa">Blue-roof villa</option></select><label for="plotLocation">Choose neighbourhood location</label><select id="plotLocation"><option value="0">Park side</option><option value="1">North gardens</option><option value="2">East district</option><option value="3">South gardens</option><option value="4">West district</option><option value="5">Central avenue</option></select><div class="actions"><button type="button" id="saveHouseStyle" class="primary">Save home design and location</button></div><p id="houseStyleStatus" class="muted">Choose a design and location.</p></div><div class="notice"><h3>Nearby neighbours</h3><p id="neighbourStatus" class="muted">Sign in to see registered homes in this world.</p><div id="neighbourList"></div></div>';
 homePanel?.append(homeControls);
 
 const communityPanel = document.querySelector("#community .panel");
@@ -30,6 +30,9 @@ const homeCustomiser = document.querySelector("#homeCustomiser");
 const houseStyleSelect = document.querySelector("#houseStyle");
 const saveHouseStyleButton = document.querySelector("#saveHouseStyle");
 const houseStyleStatus = document.querySelector("#houseStyleStatus");
+const plotLocationSelect = document.querySelector("#plotLocation");
+const neighbourStatus = document.querySelector("#neighbourStatus");
+const neighbourList = document.querySelector("#neighbourList");
 const ideaStatus = document.querySelector("#suggestionStatus");
 const ideaList = document.querySelector("#liveSuggestions");
 
@@ -120,8 +123,9 @@ async function startCloud() {
       if (!user) return;
       saveHouseStyleButton.disabled = true;
       try {
-        await dbSdk.updateDoc(dbSdk.doc(db,"homes",user.uid), {houseStyle:houseStyleSelect.value});
-        houseStyleStatus.textContent = "House design saved to your account.";
+        await dbSdk.updateDoc(dbSdk.doc(db,"homes",user.uid), {houseStyle:houseStyleSelect.value,plotLocation:Number(plotLocationSelect.value)});
+        houseStyleStatus.textContent = "Your home design and neighbourhood location are saved.";
+        await loadHome(user,db,dbSdk);
       } catch (e) {
         houseStyleStatus.textContent = "Could not save design: " + e.message;
       } finally {
@@ -146,7 +150,8 @@ async function startCloud() {
             displayName:String(local.displayName || user.displayName || "World Visitor").slice(0,24),
             plotNumber,
             createdAt:dbSdk.serverTimestamp(),
-            houseStyle:"starter"
+            houseStyle:"starter",
+            plotLocation:0
           });
           tx.set(counterRef,{nextPlot:plotNumber+1});
         });
@@ -181,6 +186,19 @@ async function startCloud() {
   }
 }
 
+
+async function loadNeighbours(db,sdk,user){
+  try{
+    const result=await sdk.getDocs(sdk.query(sdk.collection(db,"homes"),sdk.limit(60)));
+    const neighbours=result.docs.filter(d=>d.id!==user.uid).map(d=>({plotNumber:d.data().plotNumber||null,displayName:String(d.data().displayName||"World resident").slice(0,24),houseStyle:d.data().houseStyle||"starter",plotLocation:Number(d.data().plotLocation||0)}));
+    neighbourList.replaceChildren();
+    if(!neighbours.length){neighbourStatus.textContent="No other registered homes yet. Your neighbourhood is waiting for its first neighbours.";window.dispatchEvent(new CustomEvent("worldNeighboursLoaded",{detail:{homes:[]}}));return;}
+    neighbourStatus.textContent=neighbours.length+" other registered home(s) found.";
+    for(const home of neighbours){const row=document.createElement("p");row.className="muted";row.textContent="HOME #"+String(home.plotNumber||"—").padStart(4,"0")+" · "+home.displayName+" · "+home.houseStyle;neighbourList.append(row);}
+    window.dispatchEvent(new CustomEvent("worldNeighboursLoaded",{detail:{homes:neighbours}}));
+  }catch(e){neighbourStatus.textContent="Could not load neighbours: "+e.message;}
+}
+
 async function loadHome(user, db, sdk) {
   try {
     const snap = await sdk.getDoc(sdk.doc(db,"homes",user.uid));
@@ -189,10 +207,11 @@ async function loadHome(user, db, sdk) {
       : "Your free plot is available. Tap Claim my free plot.";
     claimButton.disabled = snap.exists();
     homeCustomiser?.classList.toggle("hidden", !snap.exists());
-    if (snap.exists()) window.dispatchEvent(new CustomEvent("worldHomeClaimed",{detail:{plotNumber:snap.data().plotNumber || null,houseStyle:snap.data().houseStyle || "starter"}}));
+    if (snap.exists()) window.dispatchEvent(new CustomEvent("worldHomeClaimed",{detail:{plotNumber:snap.data().plotNumber || null,houseStyle:snap.data().houseStyle || "starter",plotLocation:Number(snap.data().plotLocation || 0)}}));
     if (snap.exists() && houseStyleSelect) {
       houseStyleSelect.value = snap.data().houseStyle || "starter";
-      houseStyleStatus.textContent = "Your saved house design is loaded.";
+      if(plotLocationSelect)plotLocationSelect.value=String(Number(snap.data().plotLocation || 0));
+      houseStyleStatus.textContent = "Your saved house design and location are loaded.";
     }
   } catch (e) {
     plotStatus.textContent = "Could not load plot: " + e.message;
@@ -201,6 +220,7 @@ async function loadHome(user, db, sdk) {
 
 async function loadIdeas(db, sdk, user) {
   try {
+    await loadNeighbours(db,sdk,user);
     const q = sdk.query(sdk.collection(db,"streetSuggestions"), sdk.orderBy("createdAt","desc"), sdk.limit(30));
     const result = await sdk.getDocs(q);
     ideaList.replaceChildren();

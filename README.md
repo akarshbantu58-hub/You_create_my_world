@@ -9,6 +9,8 @@ A mobile-friendly community virtual-world website.
 - Google sign-in when Firebase is configured
 - One free virtual home plot per signed-in account, with a unique house number
 - Claimed homes appear as a marked house in the 3D neighbourhood
+- Home editor saves one of six neighbourhood zones and one of four house styles
+- Signed-in residents can view a directory and 3D markers for other registered homes
 - Shared street-name suggestions and one vote per account per suggestion
 - Firestore security rules in `firestore.rules`
 
@@ -24,7 +26,7 @@ The code is committed, but shared accounts, plots and votes will stay disabled u
 7. Publish the rules from `firestore.rules` in Firestore → Rules.
 8. Commit `firebase-config.js`. GitHub Pages will rebuild the site.
 
-The app uses Google sign-in, so visitors do not create or share a separate password with this website. Firestore rules enforce ownership of each home document, assign unique house numbers through a shared transaction counter, and allow one vote per signed-in account for each street suggestion. After changing `firestore.rules`, publish the latest rules in Firebase Console → Firestore → Rules before testing plot claims.
+The app uses Google sign-in, so visitors do not create or share a separate password with this website. Firestore rules enforce ownership of each home document, assign unique house numbers through a shared transaction counter, and allow one vote per signed-in account for each street suggestion. After changing `firestore.rules`, publish the latest rules in Firebase Console → Firestore → Rules before testing plot claims or saving home locations.
 
 ## Privacy and safety
 - Use a nickname, not a legal name.

@@ -30,20 +30,20 @@ function bootWorld() {
 
   const mat = (color, roughness = 0.85) => new THREE.MeshStandardMaterial({ color, roughness });
   const grass = mat("#285c58"), road = mat("#26364b"), roadLine = mat("#8ca7b6");
-  const ground = new THREE.Mesh(new THREE.CylinderGeometry(34, 38, 3, 72), mat("#183b50"));
+  const ground = new THREE.Mesh(new THREE.CylinderGeometry(174, 180, 3, 96), mat("#183b50"));
   ground.position.y = -1.6; ground.receiveShadow = true; scene.add(ground);
-  const lawn = new THREE.Mesh(new THREE.CircleGeometry(34, 72), grass);
+  const lawn = new THREE.Mesh(new THREE.CircleGeometry(174, 96), grass);
   lawn.rotation.x = -Math.PI / 2; lawn.position.y = 0; lawn.receiveShadow = true; scene.add(lawn);
 
   // Curved-looking starter neighbourhood: central roads and small home plots.
-  const roadA = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.08, 62), road);
+  const roadA = new THREE.Mesh(new THREE.BoxGeometry(8, 0.08, 340), road);
   roadA.position.set(0, 0.05, 0); scene.add(roadA);
-  const roadB = new THREE.Mesh(new THREE.BoxGeometry(62, 0.08, 5.5), road);
+  const roadB = new THREE.Mesh(new THREE.BoxGeometry(340, 0.08, 8), road);
   roadB.position.set(0, 0.06, 0); scene.add(roadB);
-  for (let n = -26; n <= 26; n += 4) {
-    const dash1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.025, 1.8), roadLine);
+  for (let n = -160; n <= 160; n += 8) {
+    const dash1 = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.025, 3.2), roadLine);
     dash1.position.set(0, 0.11, n); scene.add(dash1);
-    const dash2 = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.025, 0.12), roadLine);
+    const dash2 = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.025, 0.16), roadLine);
     dash2.position.set(n, 0.11, 0); scene.add(dash2);
   }
 
@@ -63,10 +63,14 @@ function bootWorld() {
     }
     scene.add(group);
   }
-  const plots = [
-    [-10,-11],[-16,-9],[-10,10],[-16,12],[10,-11],[16,-9],[10,10],[16,12],
-    [-25,-18],[-25,18],[25,-18],[25,18],[-18,-25],[18,-25],[-18,25],[18,25]
-  ];
+  // Larger town grid: many residential blocks around the central avenues.
+  const plots = [];
+  for (let x=-144; x<=144; x+=24) {
+    for (let z=-144; z<=144; z+=24) {
+      if (Math.abs(x)<17 || Math.abs(z)<17 || Math.hypot(x,z)>160) continue;
+      plots.push([x,z]);
+    }
+  }
   plots.forEach((p,i) => addHouse(p[0],p[1],i));
 
   // A small park, trees and a glowing community beacon.
@@ -78,7 +82,9 @@ function bootWorld() {
     const crown = new THREE.Mesh(new THREE.SphereGeometry(1.05,12,10),mat("#4e9b72"));
     crown.position.set(x,1.8,z); crown.castShadow=true; scene.add(crown);
   }
-  [[-12,-2],[-7,-3],[-12,3],[-6,2],[7,8],[22,8],[-23,-5]].forEach(p=>tree(...p));
+  [[-12,-2],[-7,-3],[-12,3],[-6,2],[7,8],[22,8],[-23,-5],
+   [-80,-65],[-88,-70],[-72,-78],[78,68],[86,74],[72,82],
+   [-112,55],[-120,62],[110,-58],[118,-66],[-45,112],[48,-118]].forEach(p=>tree(...p));
   const beacon = new THREE.Mesh(new THREE.CylinderGeometry(.28,.5,3.2,12),new THREE.MeshStandardMaterial({color:"#58e5ee",emissive:"#168da8",emissiveIntensity:1.2}));
   beacon.position.set(0,1.7,-8); scene.add(beacon);
 
@@ -140,7 +146,7 @@ function bootWorld() {
   // Touch joystick replaces keyboard movement for phone/tablet play.
   const joystick = document.querySelector("#worldJoystick");
   const stick = document.querySelector("#joystickStick");
-  let joystickPointer = null, joyX = 0, joyY = 0, walkPhase = 0;
+  let joystickPointer = null, joyX = 0, joyY = 0, walkPhase = 0;\n  const clock = new THREE.Clock();
   function updateJoystick(e){
     const r=joystick.getBoundingClientRect(), cx=r.left+r.width/2, cy=r.top+r.height/2;
     const dx=e.clientX-cx, dy=e.clientY-cy, max=r.width*.34, len=Math.hypot(dx,dy)||1;
@@ -184,13 +190,28 @@ function bootWorld() {
     const leftKey=joyX < -.12, rightKey=joyX > .12;
     forward.set(-Math.sin(yaw),0,-Math.cos(yaw));
     right.set(Math.cos(yaw),0,-Math.sin(yaw));
-    const speed=.12;
-    if(forwardKey)player.position.addScaledVector(forward,speed);
-    if(backKey)player.position.addScaledVector(forward,-speed);
-    if(leftKey)player.position.addScaledVector(right,-speed);
-    if(rightKey)player.position.addScaledVector(right,speed);
-    player.position.x=THREE.MathUtils.clamp(player.position.x,-30,30);
-    player.position.z=THREE.MathUtils.clamp(player.position.z,-30,30);
+    const delta=Math.min(clock.getDelta(),0.05);
+    const moveX=joyX, moveZ=joyY;
+    const moveLength=Math.hypot(moveX,moveZ);
+    const moving=moveLength>0.16;
+    if(moving){
+      const direction=forward.clone().multiplyScalar(-moveZ).add(right.clone().multiplyScalar(moveX)).normalize();
+      player.position.addScaledVector(direction,9.5*delta*Math.min(1,moveLength));
+      player.rotation.y=Math.atan2(-direction.x,-direction.z);
+      walkPhase+=delta*10.5*Math.min(1,moveLength);
+      const swing=Math.sin(walkPhase)*0.62;
+      legPivots[0].rotation.x=swing;
+      legPivots[1].rotation.x=-swing;
+      armPivots[0].rotation.x=-swing*0.65;
+      armPivots[1].rotation.x=swing*0.65;
+      torso.rotation.x=0.035+Math.abs(Math.sin(walkPhase*2))*0.025;
+    } else {
+      legPivots.forEach(l=>l.rotation.x=THREE.MathUtils.damp(l.rotation.x,0,10,delta));
+      armPivots.forEach(a=>a.rotation.x=THREE.MathUtils.damp(a.rotation.x,0,10,delta));
+      torso.rotation.x=THREE.MathUtils.damp(torso.rotation.x,0,10,delta);
+    }
+    player.position.x=THREE.MathUtils.clamp(player.position.x,-165,165);
+    player.position.z=THREE.MathUtils.clamp(player.position.z,-165,165);
     player.rotation.y=yaw;
     const eye=player.position.clone().add(new THREE.Vector3(0,firstPerson?1.55:2.3,0));
     const camOffset=firstPerson?new THREE.Vector3(0,0,0):new THREE.Vector3(Math.sin(yaw)*cameraZoom,cameraZoom*.42,Math.cos(yaw)*cameraZoom);

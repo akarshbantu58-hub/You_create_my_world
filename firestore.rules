@@ -35,8 +35,11 @@ service cloud.firestore {
       allow update: if owns(uid)
         && resource.data.ownerUid == request.auth.uid
         && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['houseStyle'])
-        && request.resource.data.houseStyle in ['starter', 'modern', 'cottage', 'villa'];
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['houseStyle','plotLocation'])
+        && request.resource.data.houseStyle in ['starter', 'modern', 'cottage', 'villa']
+        && request.resource.data.plotLocation is int
+        && request.resource.data.plotLocation >= 0
+        && request.resource.data.plotLocation <= 5;
       allow delete: if false;
     }
 

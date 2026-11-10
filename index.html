@@ -23,4 +23,5 @@ document.getElementById('profileForm').addEventListener('submit',e=>{e.preventDe
 document.getElementById('clearProfile').addEventListener('click',()=>{localStorage.removeItem('worldProfile');sessionStorage.removeItem('worldProfile');document.getElementById('profileForm').reset();renderProfile();});
 const old=readProfile();if(old){document.getElementById('displayName').value=old.displayName||'';document.getElementById('worldName').value=old.worldName||'';document.getElementById('instagram').value=old.instagram||'';document.getElementById('showInstagram').checked=!!old.showInstagram;document.getElementById('interest').value=old.interest||'Explore the world';}renderProfile();
 </script><script type="module" src="app.js"></script>
+<script type="module" src="world3d.js"></script>
 </body></html>

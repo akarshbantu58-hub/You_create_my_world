@@ -7,7 +7,8 @@ A mobile-friendly community virtual-world website.
 - Visitor display name and world username
 - Optional Instagram ID, shown only with explicit permission
 - Google sign-in when Firebase is configured
-- One free virtual home plot per signed-in account
+- One free virtual home plot per signed-in account, with a unique house number
+- Claimed homes appear as a marked house in the 3D neighbourhood
 - Shared street-name suggestions and one vote per account per suggestion
 - Firestore security rules in `firestore.rules`
 
@@ -23,13 +24,14 @@ The code is committed, but shared accounts, plots and votes will stay disabled u
 7. Publish the rules from `firestore.rules` in Firestore → Rules.
 8. Commit `firebase-config.js`. GitHub Pages will rebuild the site.
 
-The app uses Google sign-in, so visitors do not create or share a separate password with this website. Firestore rules enforce ownership of each home document and one vote per signed-in account for each street suggestion.
+The app uses Google sign-in, so visitors do not create or share a separate password with this website. Firestore rules enforce ownership of each home document, assign unique house numbers through a shared transaction counter, and allow one vote per signed-in account for each street suggestion. After changing `firestore.rules`, publish the latest rules in Firebase Console → Firestore → Rules before testing plot claims.
 
 ## Privacy and safety
 - Use a nickname, not a legal name.
 - Instagram ID is optional and is hidden unless the owner gives permission.
 - Do not collect gender, date of birth, phone number, home address or live location.
 - Public street suggestions should be moderated before they become official world locations.
+- House numbers are virtual identifiers only; they do not represent real addresses.
 - This prototype does not show a live population counter yet. Do not treat demo values as real users.
 
 ## Publish with GitHub Pages

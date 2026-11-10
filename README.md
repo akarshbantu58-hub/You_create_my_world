@@ -1,24 +1,41 @@
 # You Create My World
 
-A community-built virtual world website preview.
+A mobile-friendly community virtual-world website.
 
-## Current preview
-- Responsive home page with a glowing planet illustration
-- Visitor profile with display name and world username
-- Optional Instagram ID with a separate permission checkbox
-- Remember profile on this browser/device
-- Explore, My Home and Community preview sections
+## Website features
+- Home, Explore, My Home and Community sections
+- Visitor display name and world username
+- Optional Instagram ID, shown only with explicit permission
+- Google sign-in when Firebase is configured
+- One free virtual home plot per signed-in account
+- Shared street-name suggestions and one vote per account per suggestion
+- Firestore security rules in `firestore.rules`
 
-## Important limitations
-This is a front-end prototype, not a secure account system. The profile is stored in this browser only. It does not create shared accounts, reserve shared plots, save houses to a database, run real votes, or calculate live population. Those features need a secure backend such as Firebase Authentication and Firestore, plus server-side rules and moderation.
+## Connect Firebase (required for shared features)
+The code is committed, but shared accounts, plots and votes will stay disabled until you connect your own Firebase project.
 
-For privacy, the form does not ask for gender, legal name, date of birth, phone number, address or live location. Do not put private information in a public profile.
+1. Open [Firebase Console](https://console.firebase.google.com/) and create a project.
+2. Add a Web App in Project settings and copy its Firebase web configuration.
+3. Replace the example values in `firebase-config.js` with the Web App values. These web config values identify your project; never paste a service-account private key or admin credentials into this public repository.
+4. In Firebase Authentication → Sign-in method, enable **Google**.
+5. In Authentication → Settings → Authorized domains, add your GitHub Pages domain (for example, `YOUR-USERNAME.github.io`).
+6. Create a Cloud Firestore database.
+7. Publish the rules from `firestore.rules` in Firestore → Rules.
+8. Commit `firebase-config.js`. GitHub Pages will rebuild the site.
+
+The app uses Google sign-in, so visitors do not create or share a separate password with this website. Firestore rules enforce ownership of each home document and one vote per signed-in account for each street suggestion.
+
+## Privacy and safety
+- Use a nickname, not a legal name.
+- Instagram ID is optional and is hidden unless the owner gives permission.
+- Do not collect gender, date of birth, phone number, home address or live location.
+- Public street suggestions should be moderated before they become official world locations.
+- This prototype does not show a live population counter yet. Do not treat demo values as real users.
 
 ## Publish with GitHub Pages
-1. Open the repository **Settings**.
-2. Open **Pages**.
-3. Under **Build and deployment**, choose **GitHub Actions** as the source.
-4. The workflow in `.github/workflows/pages.yml` will publish the site.
-5. When the workflow succeeds, open the Pages URL shown in Settings → Pages.
+1. Open repository Settings → Pages.
+2. Under Build and deployment, choose **GitHub Actions** as the source.
+3. The workflow in `.github/workflows/pages.yml` deploys the site on pushes to `main`.
+4. Open the Pages URL shown in Settings → Pages after the workflow succeeds.
 
-The site entry point is `index.html`.
+The website entry point is `index.html`.

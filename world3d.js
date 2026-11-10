@@ -212,7 +212,6 @@ function bootWorld() {
     }
     player.position.x=THREE.MathUtils.clamp(player.position.x,-165,165);
     player.position.z=THREE.MathUtils.clamp(player.position.z,-165,165);
-    player.rotation.y=yaw;
     const eye=player.position.clone().add(new THREE.Vector3(0,firstPerson?1.55:2.3,0));
     const camOffset=firstPerson?new THREE.Vector3(0,0,0):new THREE.Vector3(Math.sin(yaw)*cameraZoom,cameraZoom*.42,Math.cos(yaw)*cameraZoom);
     camera.position.copy(eye).add(camOffset);

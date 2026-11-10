@@ -87,6 +87,39 @@ function bootWorld() {
   }
   plots.forEach((p,i) => addHouse(p[0],p[1],i));
 
+  // Show the signed-in visitor's reserved plot when Firebase reports it.
+  let ownedPlotGroup = null;
+  function showOwnedPlot(plotNumber, houseStyle="starter") {
+    if (ownedPlotGroup) scene.remove(ownedPlotGroup);
+    if (!Number.isInteger(plotNumber) || plotNumber < 1) return;
+    const spot = plots[(plotNumber - 1) % plots.length];
+    const [px,pz] = spot;
+    const group = new THREE.Group();
+    group.position.set(px,0,pz);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(3.1,3.55,40),new THREE.MeshBasicMaterial({color:"#62e9f1",side:THREE.DoubleSide}));
+    ring.rotation.x=-Math.PI/2; ring.position.y=.08; group.add(ring);
+    const bodyColor = houseStyle==="modern" ? "#a8d9e8" : houseStyle==="cottage" ? "#d7b68d" : houseStyle==="villa" ? "#c4d6ee" : "#d9c5a2";
+    const body = new THREE.Mesh(new THREE.BoxGeometry(3.8,2.5,3.5),mat(bodyColor));
+    body.position.y=1.3; body.castShadow=true; group.add(body);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(2.9,1.5,4),mat(houseStyle==="villa" ? "#426db0" : "#354963"));
+    roof.position.y=3.25; roof.rotation.y=Math.PI/4; roof.castShadow=true; group.add(roof);
+    const badgeCanvas=document.createElement("canvas"); badgeCanvas.width=512; badgeCanvas.height=128;
+    const ctx=badgeCanvas.getContext("2d");
+    ctx.fillStyle="#071526"; ctx.fillRect(0,0,512,128);
+    ctx.strokeStyle="#62e9f1"; ctx.lineWidth=8; ctx.strokeRect(4,4,504,120);
+    ctx.fillStyle="#eafcff"; ctx.font="bold 54px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText("HOME #"+String(plotNumber).padStart(4,"0"),256,64);
+    const texture=new THREE.CanvasTexture(badgeCanvas);
+    const tag=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,transparent:true,depthTest:false}));
+    tag.position.set(0,5.4,0); tag.scale.set(8,2,1); group.add(tag);
+    scene.add(group); ownedPlotGroup=group;
+    document.querySelector("#worldHint").textContent="Your reserved home is marked HOME #"+String(plotNumber).padStart(4,"0")+". Use the joystick to explore.";
+  }
+  window.addEventListener("worldHomeClaimed",event=>{
+    const detail=event.detail||{};
+    showOwnedPlot(Number(detail.plotNumber),detail.houseStyle||"starter");
+  });
+
   // A small park, trees and a glowing community beacon.
   const park = new THREE.Mesh(new THREE.CircleGeometry(5, 32), mat("#39745a"));
   park.rotation.x = -Math.PI/2; park.position.set(-9,.04,0); scene.add(park);

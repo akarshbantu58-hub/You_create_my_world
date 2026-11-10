@@ -162,7 +162,8 @@ async function loadIdeas(db, sdk, user) {
       const row = document.createElement("div");
       row.className = "vote";
       const label = document.createElement("span");
-      label.textContent = data.name + " · suggested by " + (data.creatorName || "Visitor");
+      const voteCount = await sdk.getCountFromServer(sdk.collection(db,"streetSuggestions",item.id,"votes"));
+      label.textContent = data.name + " · " + voteCount.data().count + " votes · suggested by " + (data.creatorName || "Visitor");
       const vote = document.createElement("button");
       vote.type = "button";
       vote.textContent = "Vote";
@@ -172,6 +173,8 @@ async function loadIdeas(db, sdk, user) {
         try {
           await sdk.setDoc(sdk.doc(db,"streetSuggestions",item.id,"votes",user.uid), {createdAt:sdk.serverTimestamp()});
           vote.textContent = "Voted";
+          const updatedCount = await sdk.getCountFromServer(sdk.collection(db,"streetSuggestions",item.id,"votes"));
+          label.textContent = data.name + " · " + updatedCount.data().count + " votes · suggested by " + (data.creatorName || "Visitor");
         } catch (e) {
           vote.textContent = e.code === "permission-denied" ? "Already voted" : "Try again";
           vote.disabled = false;

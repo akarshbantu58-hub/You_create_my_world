@@ -25,15 +25,33 @@ service cloud.firestore {
     match /homes/{uid} {
       allow read: if signedIn();
       allow create: if owns(uid)
-        && request.resource.data.keys().hasOnly(['ownerUid', 'displayName', 'createdAt', 'houseStyle'])
+        && request.resource.data.keys().hasOnly(['ownerUid', 'displayName', 'plotNumber', 'createdAt', 'houseStyle'])
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.displayName is string
-        && request.resource.data.displayName.size() <= 24;
+        && request.resource.data.displayName.size() <= 24
+        && request.resource.data.plotNumber is int
+        && request.resource.data.plotNumber >= 1
+        && getAfter(/databases/$(database)/documents/worldMeta/plotCounter).data.nextPlot == request.resource.data.plotNumber + 1;
       allow update: if owns(uid)
         && resource.data.ownerUid == request.auth.uid
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['houseStyle'])
         && request.resource.data.houseStyle in ['starter', 'modern', 'cottage', 'villa'];
+      allow delete: if false;
+    }
+
+
+    // Unique plot numbers are assigned in the same transaction as each home.
+    match /worldMeta/plotCounter {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['nextPlot'])
+        && request.resource.data.nextPlot == 2
+        && getAfter(/databases/$(database)/documents/homes/$(request.auth.uid)).data.plotNumber == 1;
+      allow update: if signedIn()
+        && request.resource.data.keys().hasOnly(['nextPlot'])
+        && request.resource.data.nextPlot == resource.data.nextPlot + 1
+        && getAfter(/databases/$(database)/documents/homes/$(request.auth.uid)).data.plotNumber == resource.data.nextPlot;
       allow delete: if false;
     }
 

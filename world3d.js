@@ -7,14 +7,14 @@ function bootWorld() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#6bb8e8");
   // A large gradient sky dome gives a distant horizon without a short fog cutoff.
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(4500, 32, 16), new THREE.ShaderMaterial({
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(40000, 32, 16), new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false,
     vertexShader: "varying vec3 vWorldPosition; void main(){ vec4 p=modelMatrix*vec4(position,1.0); vWorldPosition=p.xyz; gl_Position=projectionMatrix*viewMatrix*p; }",
     fragmentShader: "varying vec3 vWorldPosition; void main(){ float h=normalize(vWorldPosition).y; vec3 horizon=vec3(0.62,0.82,0.94); vec3 zenith=vec3(0.025,0.10,0.28); float t=smoothstep(-0.12,0.72,h); gl_FragColor=vec4(mix(horizon,zenith,t),1.0); }"
   }));
   scene.add(sky);
 
-  const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 5000);
+  const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 50000);
   camera.position.set(0, 310, 0);
   camera.up.set(0, 0, -1);
   camera.lookAt(0, 0, 0);
@@ -34,8 +34,9 @@ function bootWorld() {
   const mat = (color, roughness = 0.85) => new THREE.MeshStandardMaterial({ color, roughness });
   const grass = mat("#285c58"), road = mat("#26364b"), roadLine = mat("#8ca7b6");
   const groundMat = mat("#183b50");
-  const ground = new THREE.Mesh(new THREE.CylinderGeometry(1200, 1210, 5, 128), groundMat);
-  ground.position.y = -2.6; ground.receiveShadow = true; scene.add(ground);
+  // One continuous flat terrain plane: no island wall, cylinder edge or raised platform.
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(20000, 20000), groundMat);
+  ground.rotation.x = -Math.PI / 2; ground.position.y = -0.035; ground.receiveShadow = true; scene.add(ground);
   const mapCanvas=document.createElement("canvas"); mapCanvas.width=1024; mapCanvas.height=1024;
   const mapCtx=mapCanvas.getContext("2d");
   mapCtx.fillStyle="#356b45"; mapCtx.fillRect(0,0,1024,1024);
@@ -53,14 +54,11 @@ function bootWorld() {
   const terrainTexture=new THREE.CanvasTexture(mapCanvas);
   terrainTexture.colorSpace=THREE.SRGBColorSpace;terrainTexture.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
   const lawnMat=new THREE.MeshStandardMaterial({map:terrainTexture,roughness:1});
-  const lawn = new THREE.Mesh(new THREE.CircleGeometry(1200, 160),lawnMat);
+  // Large seamless flat terrain. Repeated texture detail keeps the surface natural at distance.
+  terrainTexture.wrapS=THREE.RepeatWrapping;terrainTexture.wrapT=THREE.RepeatWrapping;terrainTexture.repeat.set(40,40);
+  const lawn = new THREE.Mesh(new THREE.PlaneGeometry(20000, 20000),lawnMat);
   lawn.rotation.x = -Math.PI / 2; lawn.position.y = 0; lawn.receiveShadow = true; scene.add(lawn);
-  // Deep blue ocean and a soft coastal glow create a large open-world map.
   const oceanMat=new THREE.MeshStandardMaterial({color:"#087f9a",roughness:.72,metalness:.05});
-  const ocean=new THREE.Mesh(new THREE.CircleGeometry(4200,160),oceanMat);
-  ocean.rotation.x=-Math.PI/2;ocean.position.y=-5.2;scene.add(ocean);
-  const coast=new THREE.Mesh(new THREE.RingGeometry(1196,1202,160),new THREE.MeshBasicMaterial({color:"#b9e7b4",transparent:true,opacity:.42,side:THREE.DoubleSide}));
-  coast.rotation.x=-Math.PI/2;coast.position.y=.035;scene.add(coast);
   const texturePacks={
     natural:{label:"Natural",land:"#356b45",light:"rgba(133,164,91,0.18)",dark:"rgba(17,66,47,0.18)",road:"#35404a",line:"#c6c2a3",water:"#087f9a",leaves:"#4e9b72",ground:"#244b48"},
     tropical:{label:"Tropical",land:"#287b50",light:"rgba(166,190,91,0.22)",dark:"rgba(7,83,54,0.2)",road:"#3d4b42",line:"#d8d0a3",water:"#087fa5",leaves:"#2f9a59",ground:"#1e5947"},
@@ -77,15 +75,7 @@ function bootWorld() {
   }
 
   // India-shaped overview layer used during the map-to-neighbourhood fly-in.
-  const india = new THREE.Shape();
-  const indiaPoints = [[0,72],[13,61],[18,48],[31,36],[25,22],[16,12],[12,-2],[4,-18],[-5,-38],[-13,-57],[-25,-43],[-34,-24],[-42,-5],[-35,12],[-25,27],[-18,43],[-8,58],[-2,68]];
-  india.moveTo(indiaPoints[0][0],indiaPoints[0][1]);
-  indiaPoints.slice(1).forEach(p=>india.lineTo(p[0],p[1]));
-  india.closePath();
-  const indiaMesh = new THREE.Mesh(new THREE.ShapeGeometry(india),new THREE.MeshStandardMaterial({color:"#5f9c70",roughness:1,side:THREE.DoubleSide}));
-  indiaMesh.rotation.x=-Math.PI/2; indiaMesh.position.y=.025; indiaMesh.scale.set(1.65,1.65,1.65); indiaMesh.receiveShadow=true; scene.add(indiaMesh);
-  const indiaEdge = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(indiaPoints.map(p=>new THREE.Vector3(p[0]*1.65,.07,-p[1]*1.65))),new THREE.LineBasicMaterial({color:"#d7e8bd",transparent:true,opacity:.9}));
-  scene.add(indiaEdge);
+  // Removed the floating country-shaped overlay; exploration now happens on one continuous world surface.
 
   // Curved-looking starter neighbourhood: central roads and small home plots.
   const roadA = new THREE.Mesh(new THREE.BoxGeometry(8, 0.08, 340), road);
@@ -192,15 +182,7 @@ function bootWorld() {
     });
   });
 
-  // Natural blue river paths across the land.
-  function addRiver(points,width=1.15){
-    const curve=new THREE.CatmullRomCurve3(points.map(p=>new THREE.Vector3(p[0],.13,p[1])));
-    const mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,100,width,8,false),new THREE.MeshStandardMaterial({color:"#3aa9c3",roughness:.35,metalness:.12}));
-    scene.add(mesh);
-  }
-  addRiver([[-145,-82],[-105,-62],[-75,-28],[-38,-18],[-8,4],[34,24],[70,50],[120,78]],1.25);
-  addRiver([[-130,105],[-95,76],[-62,58],[-32,36],[5,20],[42,-5],[88,-34],[132,-58]],.85);
-  // A small park, trees and a glowing community beacon.
+  // No tube-shaped river meshes or raised pipe-like map decorations.  // A small park, trees and a glowing community beacon.
   const park = new THREE.Mesh(new THREE.CircleGeometry(5, 32), mat("#39745a"));
   park.rotation.x = -Math.PI/2; park.position.set(-9,.04,0); scene.add(park);
   let leafMaterial=mat("#4e9b72");
@@ -213,12 +195,12 @@ function bootWorld() {
   // A wide outer landscape gives the town a sense of distance beyond the starter streets.
   const forestGeometry=new THREE.ConeGeometry(3.2,9,7);
   const forestTrunkGeometry=new THREE.CylinderGeometry(.35,.5,2.4,6);
-  const forestLeaves=new THREE.InstancedMesh(forestGeometry,leafMaterial,520);
-  const forestTrunks=new THREE.InstancedMesh(forestTrunkGeometry,mat("#76543b"),520);
+  const forestLeaves=new THREE.InstancedMesh(forestGeometry,leafMaterial,1600);
+  const forestTrunks=new THREE.InstancedMesh(forestTrunkGeometry,mat("#76543b"),1600);
   const forestDummy=new THREE.Object3D();let forestCount=0,forestSeed=7141;
   const forestRandom=()=>{forestSeed=(forestSeed*1664525+1013904223)>>>0;return forestSeed/4294967296;};
-  for(let n=0;n<520;n++){
-    const angle=forestRandom()*Math.PI*2, radius=360+forestRandom()*760;
+  for(let n=0;n<1600;n++){
+    const angle=forestRandom()*Math.PI*2, radius=900+forestRandom()*8500;
     const x=Math.cos(angle)*radius,z=Math.sin(angle)*radius;
     forestDummy.position.set(x,4.5,z);forestDummy.rotation.y=forestRandom()*Math.PI;const scale=.65+forestRandom()*1.35;forestDummy.scale.set(scale,scale,scale);forestDummy.updateMatrix();forestLeaves.setMatrixAt(forestCount,forestDummy.matrix);
     forestDummy.position.y=1.2;forestDummy.scale.set(scale,scale,scale);forestDummy.updateMatrix();forestTrunks.setMatrixAt(forestCount,forestDummy.matrix);forestCount++;
@@ -270,7 +252,7 @@ function bootWorld() {
   let firstPerson = false, yaw = Math.PI, pitch = -.12;
   const introStarted=performance.now();
   const introDuration=6800;
-  const mapStart=new THREE.Vector3(0,1850,0);
+  const mapStart=new THREE.Vector3(0,4200,0);
   const mapTarget=new THREE.Vector3(0,0,0);
   let introComplete=false;
   const held = new Set();
@@ -382,7 +364,7 @@ function bootWorld() {
         scene.add(group);entry={group,target:new THREE.Vector3(data.x||0,0,data.z||0)};
         remotePlayers.set(data.id,entry);
       }
-      entry.target.set(THREE.MathUtils.clamp(Number(data.x)||0,-1180,1180),0,THREE.MathUtils.clamp(Number(data.z)||0,-1180,1180));
+      entry.target.set(THREE.MathUtils.clamp(Number(data.x)||0,-10000,10000),0,THREE.MathUtils.clamp(Number(data.z)||0,-10000,10000));
     }
   });
   let lastPositionBroadcast=0;
@@ -416,8 +398,8 @@ function bootWorld() {
       torso.rotation.x=THREE.MathUtils.damp(torso.rotation.x,0,10,delta);
     }
     if(!grounded||jumpVelocity!==0){player.position.y+=jumpVelocity*delta;jumpVelocity-=18*delta;if(player.position.y<=0){player.position.y=0;jumpVelocity=0;grounded=true;}}
-    player.position.x=THREE.MathUtils.clamp(player.position.x,-1180,1180);
-    player.position.z=THREE.MathUtils.clamp(player.position.z,-1180,1180);
+    player.position.x=THREE.MathUtils.clamp(player.position.x,-10000,10000);
+    player.position.z=THREE.MathUtils.clamp(player.position.z,-10000,10000);
     const eye=player.position.clone().add(new THREE.Vector3(0,firstPerson?1.55:2.3,0));
     const camOffset=firstPerson?new THREE.Vector3(0,0,0):new THREE.Vector3(Math.sin(yaw)*cameraZoom,cameraZoom*.42,Math.cos(yaw)*cameraZoom);
     const followPosition=eye.clone().add(camOffset);

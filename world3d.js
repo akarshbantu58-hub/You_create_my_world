@@ -35,8 +35,29 @@ function bootWorld() {
   const grass = mat("#285c58"), road = mat("#26364b"), roadLine = mat("#8ca7b6");
   const ground = new THREE.Mesh(new THREE.CylinderGeometry(174, 180, 3, 96), mat("#183b50"));
   ground.position.y = -1.6; ground.receiveShadow = true; scene.add(ground);
-  const lawn = new THREE.Mesh(new THREE.CircleGeometry(174, 96), grass);
+  const mapCanvas=document.createElement("canvas"); mapCanvas.width=1024; mapCanvas.height=1024;
+  const mapCtx=mapCanvas.getContext("2d");
+  mapCtx.fillStyle="#356b45"; mapCtx.fillRect(0,0,1024,1024);
+  let seed=9137;
+  const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+  for(let i=0;i<26000;i++){
+    const x=random()*1024,y=random()*1024,r=2+random()*15;
+    mapCtx.fillStyle=random()>.52?"rgba(117,151,83,0.12)":"rgba(18,66,48,0.13)";
+    mapCtx.beginPath();mapCtx.ellipse(x,y,r,r*(.4+random()),random()*Math.PI,0,Math.PI*2);mapCtx.fill();
+  }
+  for(let i=0;i<95;i++){
+    const x=random()*1024,y=random()*1024,r=12+random()*45;
+    mapCtx.fillStyle="rgba(25,78,49,0.16)";mapCtx.beginPath();mapCtx.arc(x,y,r,0,Math.PI*2);mapCtx.fill();
+  }
+  const terrainTexture=new THREE.CanvasTexture(mapCanvas);
+  terrainTexture.colorSpace=THREE.SRGBColorSpace;terrainTexture.anisotropy=renderer.capabilities.getMaxAnisotropy();
+  const lawn = new THREE.Mesh(new THREE.CircleGeometry(174, 128),new THREE.MeshStandardMaterial({map:terrainTexture,roughness:1}));
   lawn.rotation.x = -Math.PI / 2; lawn.position.y = 0; lawn.receiveShadow = true; scene.add(lawn);
+  // Deep blue ocean and a soft coastal glow create a map-like India overview.
+  const ocean=new THREE.Mesh(new THREE.CircleGeometry(900,128),new THREE.MeshStandardMaterial({color:"#087f9a",roughness:.72,metalness:.05}));
+  ocean.rotation.x=-Math.PI/2;ocean.position.y=-2.1;scene.add(ocean);
+  const coast=new THREE.Mesh(new THREE.RingGeometry(171,175,128),new THREE.MeshBasicMaterial({color:"#b9e7b4",transparent:true,opacity:.62,side:THREE.DoubleSide}));
+  coast.rotation.x=-Math.PI/2;coast.position.y=.035;scene.add(coast);
 
   // India-shaped overview layer used during the map-to-neighbourhood fly-in.
   const india = new THREE.Shape();
@@ -98,7 +119,13 @@ function bootWorld() {
     const pool = candidates.length ? candidates : plots;
     return pool[(Math.max(1,Number(plotNumber)||1)-1)%pool.length];
   }
-  plots.forEach((p,i) => addHouse(p[0],p[1],i));
+  plots.forEach((p,i) => {
+    addHouse(p[0],p[1],i);
+    const dot=new THREE.Mesh(new THREE.CircleGeometry(.72,16),new THREE.MeshBasicMaterial({color:"#ffad32"}));
+    dot.rotation.x=-Math.PI/2;dot.position.set(p[0],.18,p[1]);scene.add(dot);
+    const halo=new THREE.Mesh(new THREE.RingGeometry(.78,1.08,20),new THREE.MeshBasicMaterial({color:"#fff0b0",transparent:true,opacity:.78,side:THREE.DoubleSide}));
+    halo.rotation.x=-Math.PI/2;halo.position.set(p[0],.19,p[1]);scene.add(halo);
+  });
 
   // Show the signed-in visitor's reserved plot when Firebase reports it.
   let ownedPlotGroup = null;
@@ -148,6 +175,14 @@ function bootWorld() {
     });
   });
 
+  // Natural blue river paths across the land.
+  function addRiver(points,width=1.15){
+    const curve=new THREE.CatmullRomCurve3(points.map(p=>new THREE.Vector3(p[0],.13,p[1])));
+    const mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,100,width,8,false),new THREE.MeshStandardMaterial({color:"#3aa9c3",roughness:.35,metalness:.12}));
+    scene.add(mesh);
+  }
+  addRiver([[-145,-82],[-105,-62],[-75,-28],[-38,-18],[-8,4],[34,24],[70,50],[120,78]],1.25);
+  addRiver([[-130,105],[-95,76],[-62,58],[-32,36],[5,20],[42,-5],[88,-34],[132,-58]],.85);
   // A small park, trees and a glowing community beacon.
   const park = new THREE.Mesh(new THREE.CircleGeometry(5, 32), mat("#39745a"));
   park.rotation.x = -Math.PI/2; park.position.set(-9,.04,0); scene.add(park);

@@ -71,11 +71,11 @@ service cloud.firestore {
         && request.resource.data.displayName.size() >= 1
         && request.resource.data.displayName.size() <= 24
         && request.resource.data.x is number
-        && request.resource.data.x >= -1180
-        && request.resource.data.x <= 1180
+        && request.resource.data.x >= -10000
+        && request.resource.data.x <= 10000
         && request.resource.data.z is number
-        && request.resource.data.z >= -1180
-        && request.resource.data.z <= 1180
+        && request.resource.data.z >= -10000
+        && request.resource.data.z <= 10000
         && request.resource.data.lastSeen == request.time;
       allow delete: if owns(uid);
     }

@@ -55,7 +55,7 @@ function bootWorld() {
   lawn.rotation.x = -Math.PI / 2; lawn.position.y = 0; lawn.receiveShadow = true; scene.add(lawn);
   // Deep blue ocean and a soft coastal glow create a map-like India overview.
   const ocean=new THREE.Mesh(new THREE.CircleGeometry(900,128),new THREE.MeshStandardMaterial({color:"#087f9a",roughness:.72,metalness:.05}));
-  ocean.rotation.x=-Math.PI/2;ocean.position.y=-2.1;scene.add(ocean);
+  ocean.rotation.x=-Math.PI/2;ocean.position.y=-3.15;scene.add(ocean);
   const coast=new THREE.Mesh(new THREE.RingGeometry(171,175,128),new THREE.MeshBasicMaterial({color:"#b9e7b4",transparent:true,opacity:.62,side:THREE.DoubleSide}));
   coast.rotation.x=-Math.PI/2;coast.position.y=.035;scene.add(coast);
 

@@ -291,7 +291,7 @@ function bootWorld() {
   const hqLight=new THREE.PointLight(0x49cfff,180,260,2);
   hqLight.position.set(0,120,-15);skyHQ.add(hqLight);
   window.addEventListener("worldVisitSkyHQ",()=>{
-    player.position.set(0,0,-185);yaw=Math.PI;pitch=-.08;
+    player.position.set(0,0,-185);yaw=0;pitch=-.08;
     const hint=document.querySelector("#worldHint");
     if(hint)hint.textContent="Welcome to Sky Headquarters — explore the reflective plaza and look up at the tower above the clouds.";
   });

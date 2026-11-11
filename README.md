@@ -9,6 +9,8 @@ A mobile-friendly community virtual-world website.
 - Google sign-in when Firebase is configured
 - One free virtual home plot per signed-in account, with a unique house number
 - Claimed homes appear as a marked house in the 3D neighbourhood
+- Expanded 3D landscape with Natural, Tropical, Highlands and Night texture packs
+- Large terrain area with distant instanced forest scenery and an overhead fly-in
 - Home editor saves one of six neighbourhood zones and one of four house styles
 - Signed-in residents can view a directory and 3D markers for other registered homes
 - Shared street-name suggestions and one vote per account per suggestion

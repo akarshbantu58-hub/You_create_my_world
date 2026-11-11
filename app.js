@@ -61,7 +61,7 @@ async function startCloud() {
     function startPresence(user,displayName){
       if(presenceTimer)clearInterval(presenceTimer);if(presenceUnsubscribe)presenceUnsubscribe();
       const ref=dbSdk.doc(db,"presence",user.uid);
-      const publish=()=>dbSdk.setDoc(ref,{displayName:String(displayName||"World visitor").slice(0,24),x:Math.max(-1180,Math.min(1180,currentPosition.x)),z:Math.max(-1180,Math.min(1180,currentPosition.z)),lastSeen:dbSdk.serverTimestamp()},{merge:true}).catch(e=>{if(presenceStatus)presenceStatus.textContent="Live player sync unavailable: "+e.message;});
+      const publish=()=>dbSdk.setDoc(ref,{displayName:String(displayName||"World visitor").slice(0,24),x:Math.max(-10000,Math.min(10000,currentPosition.x)),z:Math.max(-10000,Math.min(10000,currentPosition.z)),lastSeen:dbSdk.serverTimestamp()},{merge:true}).catch(e=>{if(presenceStatus)presenceStatus.textContent="Live player sync unavailable: "+e.message;});
       publish();presenceTimer=setInterval(publish,2500);
       presenceUnsubscribe=dbSdk.onSnapshot(dbSdk.query(dbSdk.collection(db,"presence"),dbSdk.limit(40)),snap=>{
         const now=Date.now();const players=snap.docs.filter(d=>d.id!==user.uid).map(d=>{const v=d.data();const seen=v.lastSeen?.toMillis?.()||0;return {id:d.id,displayName:String(v.displayName||"World visitor").slice(0,24),x:Number(v.x)||0,z:Number(v.z)||0,online:seen>0&&now-seen<12000};}).filter(p=>p.online);

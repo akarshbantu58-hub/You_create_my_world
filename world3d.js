@@ -33,8 +33,9 @@ function bootWorld() {
 
   const mat = (color, roughness = 0.85) => new THREE.MeshStandardMaterial({ color, roughness });
   const grass = mat("#285c58"), road = mat("#26364b"), roadLine = mat("#8ca7b6");
-  const ground = new THREE.Mesh(new THREE.CylinderGeometry(174, 180, 3, 96), mat("#183b50"));
-  ground.position.y = -1.6; ground.receiveShadow = true; scene.add(ground);
+  const groundMat = mat("#183b50");
+  const ground = new THREE.Mesh(new THREE.CylinderGeometry(1200, 1210, 5, 128), groundMat);
+  ground.position.y = -2.6; ground.receiveShadow = true; scene.add(ground);
   const mapCanvas=document.createElement("canvas"); mapCanvas.width=1024; mapCanvas.height=1024;
   const mapCtx=mapCanvas.getContext("2d");
   mapCtx.fillStyle="#356b45"; mapCtx.fillRect(0,0,1024,1024);
@@ -50,14 +51,30 @@ function bootWorld() {
     mapCtx.fillStyle="rgba(25,78,49,0.16)";mapCtx.beginPath();mapCtx.arc(x,y,r,0,Math.PI*2);mapCtx.fill();
   }
   const terrainTexture=new THREE.CanvasTexture(mapCanvas);
-  terrainTexture.colorSpace=THREE.SRGBColorSpace;terrainTexture.anisotropy=renderer.capabilities.getMaxAnisotropy();
-  const lawn = new THREE.Mesh(new THREE.CircleGeometry(174, 128),new THREE.MeshStandardMaterial({map:terrainTexture,roughness:1}));
+  terrainTexture.colorSpace=THREE.SRGBColorSpace;terrainTexture.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
+  const lawnMat=new THREE.MeshStandardMaterial({map:terrainTexture,roughness:1});
+  const lawn = new THREE.Mesh(new THREE.CircleGeometry(1200, 160),lawnMat);
   lawn.rotation.x = -Math.PI / 2; lawn.position.y = 0; lawn.receiveShadow = true; scene.add(lawn);
-  // Deep blue ocean and a soft coastal glow create a map-like India overview.
-  const ocean=new THREE.Mesh(new THREE.CircleGeometry(900,128),new THREE.MeshStandardMaterial({color:"#087f9a",roughness:.72,metalness:.05}));
-  ocean.rotation.x=-Math.PI/2;ocean.position.y=-3.15;scene.add(ocean);
-  const coast=new THREE.Mesh(new THREE.RingGeometry(171,175,128),new THREE.MeshBasicMaterial({color:"#b9e7b4",transparent:true,opacity:.62,side:THREE.DoubleSide}));
+  // Deep blue ocean and a soft coastal glow create a large open-world map.
+  const oceanMat=new THREE.MeshStandardMaterial({color:"#087f9a",roughness:.72,metalness:.05});
+  const ocean=new THREE.Mesh(new THREE.CircleGeometry(4200,160),oceanMat);
+  ocean.rotation.x=-Math.PI/2;ocean.position.y=-5.2;scene.add(ocean);
+  const coast=new THREE.Mesh(new THREE.RingGeometry(1196,1202,160),new THREE.MeshBasicMaterial({color:"#b9e7b4",transparent:true,opacity:.42,side:THREE.DoubleSide}));
   coast.rotation.x=-Math.PI/2;coast.position.y=.035;scene.add(coast);
+  const texturePacks={
+    natural:{label:"Natural",land:"#356b45",light:"rgba(133,164,91,0.18)",dark:"rgba(17,66,47,0.18)",road:"#35404a",line:"#c6c2a3",water:"#087f9a",leaves:"#4e9b72",ground:"#244b48"},
+    tropical:{label:"Tropical",land:"#287b50",light:"rgba(166,190,91,0.22)",dark:"rgba(7,83,54,0.2)",road:"#3d4b42",line:"#d8d0a3",water:"#087fa5",leaves:"#2f9a59",ground:"#1e5947"},
+    highlands:{label:"Highlands",land:"#777d58",light:"rgba(194,174,123,0.2)",dark:"rgba(57,71,58,0.22)",road:"#45484a",line:"#d5c9a5",water:"#477f91",leaves:"#6f875c",ground:"#535e52"},
+    night:{label:"Night",land:"#182f36",light:"rgba(89,142,135,0.18)",dark:"rgba(4,17,31,0.28)",road:"#17263b",line:"#4c8795",water:"#073b67",leaves:"#245c55",ground:"#101e31"}
+  };
+  let activePack="natural";
+  function paintTerrain(pack){
+    mapCtx.fillStyle=pack.land;mapCtx.fillRect(0,0,1024,1024);
+    let localSeed=9137;const rand=()=>{localSeed=(localSeed*1664525+1013904223)>>>0;return localSeed/4294967296;};
+    for(let n=0;n<26000;n++){const x=rand()*1024,y=rand()*1024,r=2+rand()*15;mapCtx.fillStyle=rand()>.52?pack.light:pack.dark;mapCtx.beginPath();mapCtx.ellipse(x,y,r,r*(.4+rand()),rand()*Math.PI,0,Math.PI*2);mapCtx.fill();}
+    for(let n=0;n<150;n++){const x=rand()*1024,y=rand()*1024,r=12+rand()*45;mapCtx.fillStyle=pack.dark;mapCtx.beginPath();mapCtx.arc(x,y,r,0,Math.PI*2);mapCtx.fill();}
+    terrainTexture.needsUpdate=true;
+  }
 
   // India-shaped overview layer used during the map-to-neighbourhood fly-in.
   const india = new THREE.Shape();
@@ -186,12 +203,27 @@ function bootWorld() {
   // A small park, trees and a glowing community beacon.
   const park = new THREE.Mesh(new THREE.CircleGeometry(5, 32), mat("#39745a"));
   park.rotation.x = -Math.PI/2; park.position.set(-9,.04,0); scene.add(park);
+  let leafMaterial=mat("#4e9b72");
   function tree(x,z) {
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.18,.25,1.4,8),mat("#76543b"));
     trunk.position.set(x,.7,z); trunk.castShadow=true; scene.add(trunk);
-    const crown = new THREE.Mesh(new THREE.SphereGeometry(1.05,12,10),mat("#4e9b72"));
+    const crown = new THREE.Mesh(new THREE.SphereGeometry(1.05,12,10),leafMaterial);
     crown.position.set(x,1.8,z); crown.castShadow=true; scene.add(crown);
   }
+  // A wide outer landscape gives the town a sense of distance beyond the starter streets.
+  const forestGeometry=new THREE.ConeGeometry(3.2,9,7);
+  const forestTrunkGeometry=new THREE.CylinderGeometry(.35,.5,2.4,6);
+  const forestLeaves=new THREE.InstancedMesh(forestGeometry,leafMaterial,520);
+  const forestTrunks=new THREE.InstancedMesh(forestTrunkGeometry,mat("#76543b"),520);
+  const forestDummy=new THREE.Object3D();let forestCount=0,forestSeed=7141;
+  const forestRandom=()=>{forestSeed=(forestSeed*1664525+1013904223)>>>0;return forestSeed/4294967296;};
+  for(let n=0;n<520;n++){
+    const angle=forestRandom()*Math.PI*2, radius=360+forestRandom()*760;
+    const x=Math.cos(angle)*radius,z=Math.sin(angle)*radius;
+    forestDummy.position.set(x,4.5,z);forestDummy.rotation.y=forestRandom()*Math.PI;const scale=.65+forestRandom()*1.35;forestDummy.scale.set(scale,scale,scale);forestDummy.updateMatrix();forestLeaves.setMatrixAt(forestCount,forestDummy.matrix);
+    forestDummy.position.y=1.2;forestDummy.scale.set(scale,scale,scale);forestDummy.updateMatrix();forestTrunks.setMatrixAt(forestCount,forestDummy.matrix);forestCount++;
+  }
+  forestLeaves.count=forestCount;forestTrunks.count=forestCount;scene.add(forestTrunks,forestLeaves);
   [[-12,-2],[-7,-3],[-12,3],[-6,2],[7,8],[22,8],[-23,-5],
    [-80,-65],[-88,-70],[-72,-78],[78,68],[86,74],[72,82],
    [-112,55],[-120,62],[110,-58],[118,-66],[-45,112],[48,-118]].forEach(p=>tree(...p));
@@ -238,7 +270,7 @@ function bootWorld() {
   let firstPerson = false, yaw = Math.PI, pitch = -.12;
   const introStarted=performance.now();
   const introDuration=6800;
-  const mapStart=new THREE.Vector3(0,310,0);
+  const mapStart=new THREE.Vector3(0,1850,0);
   const mapTarget=new THREE.Vector3(0,0,0);
   let introComplete=false;
   const held = new Set();
@@ -292,6 +324,14 @@ function bootWorld() {
       hint.textContent="Walk closer to a house, then tap Visit nearby home.";
     }
   });
+  const packSelect=document.querySelector("#texturePack");
+  function applyTexturePack(name){
+    const pack=texturePacks[name]||texturePacks.natural;activePack=name in texturePacks?name:"natural";
+    paintTerrain(pack);road.color.set(pack.road);roadLine.color.set(pack.line);oceanMat.color.set(pack.water);groundMat.color.set(pack.ground);leafMaterial.color.set(pack.leaves);forestLeaves.material=leafMaterial;
+    const status=document.querySelector("#worldHint");if(status)status.textContent=pack.label+" texture pack active. Explore the expanded terrain with the joystick.";
+  }
+  paintTerrain(texturePacks.natural);
+  packSelect?.addEventListener("change",()=>applyTexturePack(packSelect.value));
   const zoomControl=document.querySelector("#cameraZoom");
   zoomControl?.addEventListener("input",()=>{cameraZoom=Number(zoomControl.value);});
   document.querySelector("#zoomOut")?.addEventListener("click",()=>{cameraZoom=Math.min(22,cameraZoom+1);if(zoomControl)zoomControl.value=String(cameraZoom);});
@@ -342,7 +382,7 @@ function bootWorld() {
         scene.add(group);entry={group,target:new THREE.Vector3(data.x||0,0,data.z||0)};
         remotePlayers.set(data.id,entry);
       }
-      entry.target.set(THREE.MathUtils.clamp(Number(data.x)||0,-165,165),0,THREE.MathUtils.clamp(Number(data.z)||0,-165,165));
+      entry.target.set(THREE.MathUtils.clamp(Number(data.x)||0,-1180,1180),0,THREE.MathUtils.clamp(Number(data.z)||0,-1180,1180));
     }
   });
   let lastPositionBroadcast=0;
@@ -376,8 +416,8 @@ function bootWorld() {
       torso.rotation.x=THREE.MathUtils.damp(torso.rotation.x,0,10,delta);
     }
     if(!grounded||jumpVelocity!==0){player.position.y+=jumpVelocity*delta;jumpVelocity-=18*delta;if(player.position.y<=0){player.position.y=0;jumpVelocity=0;grounded=true;}}
-    player.position.x=THREE.MathUtils.clamp(player.position.x,-165,165);
-    player.position.z=THREE.MathUtils.clamp(player.position.z,-165,165);
+    player.position.x=THREE.MathUtils.clamp(player.position.x,-1180,1180);
+    player.position.z=THREE.MathUtils.clamp(player.position.z,-1180,1180);
     const eye=player.position.clone().add(new THREE.Vector3(0,firstPerson?1.55:2.3,0));
     const camOffset=firstPerson?new THREE.Vector3(0,0,0):new THREE.Vector3(Math.sin(yaw)*cameraZoom,cameraZoom*.42,Math.cos(yaw)*cameraZoom);
     const followPosition=eye.clone().add(camOffset);

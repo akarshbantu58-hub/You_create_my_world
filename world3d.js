@@ -212,6 +212,90 @@ function bootWorld() {
   const beacon = new THREE.Mesh(new THREE.CylinderGeometry(.28,.5,3.2,12),new THREE.MeshStandardMaterial({color:"#58e5ee",emissive:"#168da8",emissiveIntensity:1.2}));
   beacon.position.set(0,1.7,-8); scene.add(beacon);
 
+  // SKY HEADQUARTERS — a monumental glass-and-chrome landmark above the clouds.
+  const skyHQ = new THREE.Group();
+  skyHQ.position.set(0,0,-260);
+  scene.add(skyHQ);
+  const chrome = new THREE.MeshStandardMaterial({color:"#b8d9ec",metalness:.92,roughness:.16});
+  const mirror = new THREE.MeshStandardMaterial({color:"#7cc9ed",metalness:.82,roughness:.1,transparent:true,opacity:.72});
+  const deepGlass = new THREE.MeshPhysicalMaterial({color:"#123a60",metalness:.72,roughness:.12,clearcoat:1,clearcoatRoughness:.05,emissive:"#06294b",emissiveIntensity:.22});
+  const blueGlow = new THREE.MeshStandardMaterial({color:"#4edfff",metalness:.45,roughness:.2,emissive:"#159bd8",emissiveIntensity:2.4});
+  const warmGlass = new THREE.MeshPhysicalMaterial({color:"#f4d9b0",metalness:.55,roughness:.18,transparent:true,opacity:.5,clearcoat:1});
+  const plaza = new THREE.Mesh(new THREE.CylinderGeometry(68,74,2.4,96),chrome);
+  plaza.position.y=1.2; plaza.receiveShadow=true; skyHQ.add(plaza);
+  const plazaTop = new THREE.Mesh(new THREE.CircleGeometry(66,96),new THREE.MeshPhysicalMaterial({color:"#244c68",metalness:.72,roughness:.13,clearcoat:1}));
+  plazaTop.rotation.x=-Math.PI/2;plazaTop.position.y=2.43;skyHQ.add(plazaTop);
+  for(const radius of [19,28,42,57,65]){
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(radius,.22,10,120),blueGlow);
+    ring.rotation.x=Math.PI/2;ring.position.y=2.65+(radius%2)*.12;skyHQ.add(ring);
+  }
+  const baseHall=new THREE.Mesh(new THREE.CylinderGeometry(25,34,18,64),deepGlass);
+  baseHall.position.y=12;skyHQ.add(baseHall);
+  const hallRoof=new THREE.Mesh(new THREE.CylinderGeometry(35,29,2.4,64),chrome);
+  hallRoof.position.y=21.5;skyHQ.add(hallRoof);
+  const tower=new THREE.Mesh(new THREE.CylinderGeometry(3.2,17,190,48,1,true),deepGlass);
+  tower.position.y=116;skyHQ.add(tower);
+  const innerSpire=new THREE.Mesh(new THREE.ConeGeometry(4.2,222,32),chrome);
+  innerSpire.position.y=126;skyHQ.add(innerSpire);
+  const core=new THREE.Mesh(new THREE.CylinderGeometry(1.1,2.8,205,24),blueGlow);
+  core.position.y=123;skyHQ.add(core);
+  for(let i=0;i<12;i++){
+    const a=i*Math.PI/6;
+    const rib=new THREE.Mesh(new THREE.CylinderGeometry(.42,.95,190,12),chrome);
+    rib.position.set(Math.cos(a)*8,105,Math.sin(a)*8);
+    rib.rotation.z=Math.cos(a)*-.12;rib.rotation.x=Math.sin(a)*.12;skyHQ.add(rib);
+    const lightLine=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,186,8),blueGlow);
+    lightLine.position.set(Math.cos(a)*8.55,105,Math.sin(a)*8.55);
+    lightLine.rotation.copy(rib.rotation);skyHQ.add(lightLine);
+  }
+  const skyRing=new THREE.Mesh(new THREE.TorusGeometry(48,2.2,16,160),chrome);
+  skyRing.rotation.x=Math.PI/2;skyRing.position.y=76;skyHQ.add(skyRing);
+  const skyRingLight=new THREE.Mesh(new THREE.TorusGeometry(46.5,.48,12,160),blueGlow);
+  skyRingLight.rotation.x=Math.PI/2;skyRingLight.position.y=76;skyHQ.add(skyRingLight);
+  const upperRing=new THREE.Mesh(new THREE.TorusGeometry(13,.8,12,100),blueGlow);
+  upperRing.rotation.x=Math.PI/2;upperRing.position.y=225;skyHQ.add(upperRing);
+  const crownBeam=new THREE.Mesh(new THREE.CylinderGeometry(.18,.75,42,16),blueGlow);
+  crownBeam.position.y=246;skyHQ.add(crownBeam);
+  for(let i=0;i<8;i++){
+    const a=i*Math.PI/4;
+    const support=new THREE.Mesh(new THREE.CylinderGeometry(.75,1.8,88,16),chrome);
+    support.position.set(Math.cos(a)*39,37,Math.sin(a)*39);
+    support.rotation.z=Math.cos(a)*-.42;support.rotation.x=Math.sin(a)*.42;skyHQ.add(support);
+  }
+  // Reflective observation deck and landscaped terraces.
+  const deck=new THREE.Mesh(new THREE.CylinderGeometry(51,54,2,96),mirror);
+  deck.position.y=76;skyHQ.add(deck);
+  for(let i=0;i<24;i++){
+    const a=i*Math.PI/12;
+    const planter=new THREE.Mesh(new THREE.BoxGeometry(3.2,1.2,7),mat("#254e43"));
+    planter.position.set(Math.cos(a)*57,3.3,Math.sin(a)*57);planter.rotation.y=-a;skyHQ.add(planter);
+    const shrub=new THREE.Mesh(new THREE.SphereGeometry(1.7,10,8),mat("#4b9b79"));
+    shrub.position.set(Math.cos(a)*57,4.5,Math.sin(a)*57);skyHQ.add(shrub);
+  }
+  // Cloud banks are made from soft overlapping volumes around the elevated deck.
+  const cloudMat=new THREE.MeshStandardMaterial({color:"#eaf6ff",roughness:1,transparent:true,opacity:.78});
+  let cloudSeed=4281;const cloudRand=()=>{cloudSeed=(cloudSeed*1664525+1013904223)>>>0;return cloudSeed/4294967296;};
+  for(let i=0;i<100;i++){
+    const a=cloudRand()*Math.PI*2,rad=76+cloudRand()*65;
+    const puff=new THREE.Mesh(new THREE.SphereGeometry(1,12,9),cloudMat);
+    const s=7+cloudRand()*17;
+    puff.scale.set(s*1.5,s*.55,s);
+    puff.position.set(Math.cos(a)*rad,70+cloudRand()*35,Math.sin(a)*rad);
+    skyHQ.add(puff);
+  }
+  // A glowing globe emblem on the front of the central tower.
+  const emblem=new THREE.Mesh(new THREE.SphereGeometry(5,32,24),new THREE.MeshStandardMaterial({color:"#72dfff",metalness:.25,roughness:.18,emissive:"#147dbb",emissiveIntensity:.85}));
+  emblem.position.set(0,39,28);skyHQ.add(emblem);
+  const emblemRing=new THREE.Mesh(new THREE.TorusGeometry(7,.22,10,64),blueGlow);
+  emblemRing.position.set(0,39,28);skyHQ.add(emblemRing);
+  const hqLight=new THREE.PointLight(0x49cfff,180,260,2);
+  hqLight.position.set(0,120,-15);skyHQ.add(hqLight);
+  window.addEventListener("worldVisitSkyHQ",()=>{
+    player.position.set(0,0,-185);yaw=Math.PI;pitch=-.08;
+    const hint=document.querySelector("#worldHint");
+    if(hint)hint.textContent="Welcome to Sky Headquarters — explore the reflective plaza and look up at the tower above the clouds.";
+  });
+
   // A recognisable human avatar built from detailed 3D body parts.
   const player = new THREE.Group();
   const skin = mat("#d9a47f"), shirt = mat("#247b9a"), trousers = mat("#26334c"), shoes = mat("#18202c"), hair = mat("#241b19");
